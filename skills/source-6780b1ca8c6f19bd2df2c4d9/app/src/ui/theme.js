@@ -1,0 +1,310 @@
+// Design tokens for the CTC dashboard — real Carta Ink brand tokens.
+//
+// Token source: the pinned Ink snapshot in src/ui/tokens.css, linked by
+// webapp/index.html. Every value below is a `var(--ink-*)` reference rather than a
+// copied hex literal — so an upstream token change lands here by replacing that one
+// file, and light/dark both resolve for free (each Ink token is declared with CSS's
+// light-dark(), and tokens.css sets color-scheme on :root).
+//
+// A previous version of this file claimed to "mirror Carta's Ink tokens" while
+// actually hardcoding invented hex (#00449E accent, #00857D teal, #8A5B00 warn).
+// Plausible-looking, but none of it traced to a real token.
+//
+// THE COLOR-ROLE RULE, which is the one most often gotten backwards:
+//   * interactivePrimary — brand BLACK. Active nav, selected rows, checked toggles,
+//     primary buttons. This is "active/primary", and it is not blue. Use it for a brand
+//     mark or a FILLED surface; for text or a rule drawn on the page, use
+//     interactivePrimaryOnPage, which adapts (see the note at that key).
+//   * linkDefault — Ink link/focus BLUE. Links, focus rings, info accents, editable
+//     values. Never used to mean "active".
+// The old palette collapsed both onto a single blue `accent`, which is exactly the
+// conflation this retrofit exists to split apart.
+//
+// Kept as a JS object rather than a stylesheet because this app styles inline and has
+// no CSS build step in the runtime path — the values are var() strings, so the browser
+// still resolves them from tokens.css.
+
+// Ink's real font chains, copied verbatim from @carta/ink's own body/h1 rules.
+// Deliberately NOT the `-apple-system, BlinkMacSystemFont, "Segoe UI"` system stack
+// this file used to carry: that pattern looks like standard practice borrowed from
+// other design systems, but it is not what Ink does.
+//
+// Inter is self-hosted from /fonts/ (see webapp/index.html) rather than pulled from
+// the rsms.me CDN the scaffold template uses. That is deliberate and predates this
+// retrofit: sw.js passes cross-origin requests straight through, so a CDN font would
+// never be cached — on an airgapped machine the page would stall on it before falling
+// back to system sans. Keep the self-hosted loader; only ever name a face here that
+// has one.
+export const SANS = 'Inter, "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif';
+
+// H1/display only. SangBleu is not vendored for this app, so Georgia — a real,
+// always-available system serif — carries it. Georgia ships only 400/700 as a system
+// font, so never request an intermediate weight on this stack.
+export const SERIF = '"SangBleu Versailles", Georgia, serif';
+
+export const MONO = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace';
+
+// Canonical Ink semantics. `C` keeps its object shape so existing views re-skin
+// without edits; the legacy key names are preserved as aliases below.
+export const C = {
+  // Surfaces
+  surfaceDefault: "var(--ink-color-global-surface-background-default)",
+  surfaceUnderlay: "var(--ink-color-global-surface-background-underlay)",
+
+  // Text
+  textDefault: "var(--ink-color-global-text-default)",
+  textSubtle: "var(--ink-color-global-text-subtle)",
+  // Quiet-but-readable label text (uppercase eyebrows, axis labels). An explicit
+  // EXTENSION with no exact Ink token: Ink's real text-disabled resolves to gray-50,
+  // which is too light to read as a label, so this deliberately reaches for gray-60.
+  textQuiet: "var(--ink-color-global-brand-gray-60)",
+
+  // Borders — two weights, and mixing them up is a visible error.
+  //   borderSubtle  hairlines between table rows and inside panels
+  //   borderDefault an interactive element's own edge (inputs, secondary buttons) and
+  //                 the table header's under-rule. Medium gray, clearly darker than a
+  //                 hairline but nowhere near the near-black text color.
+  borderSubtle: "var(--ink-color-global-border-subtle)",
+  borderDefault: "var(--ink-color-global-border-default)",
+  borderHover: "var(--ink-color-global-border-hover)",
+
+  // Interactive roles — see the color-role rule in the header comment.
+  //
+  // interactivePrimary is brand black and DOES NOT ADAPT: --ink-color-global-brand-black
+  // is a flat #1A1A1A, not a light-dark() pair like the text tokens. That is right for a
+  // brand mark on a known-light surface, and wrong for anything that has to stay legible
+  // on a surface that flips — in dark mode it renders #1A1A1A on an #121212 background,
+  // i.e. invisible. The selected tab's label and underline both used it and both
+  // disappeared in dark mode.
+  //
+  // So the role is split in two:
+  //   interactivePrimary        the brand mark / a filled surface's own colour. Unchanged.
+  //   interactivePrimaryOnPage  the same ROLE as foreground text or a rule drawn directly
+  //                             on the page. Adapts, because the page does.
+  //
+  // interactivePrimaryOnPage tracks text-default deliberately rather than being a second
+  // hand-mixed pair: "selected" here is conveyed by full-contrast text plus weight and an
+  // underline, and full-contrast text is exactly what text-default means on either
+  // surface. A bespoke pair would be one more thing to keep in step with Ink.
+  interactivePrimary: "var(--ink-color-global-brand-black)",
+  // The foreground for text ON interactivePrimary. NOT surfaceDefault: that token
+  // is theme-aware and resolves to near-black in dark mode, where the primary
+  // button's own near-black background made the label invisible. This fill is a
+  // fixed dark in both themes, so its text is a fixed light.
+  onPrimary: "var(--ink-color-global-brand-white)",
+  // Pool-bar segments: blue (used) vs turquoise (planned) for hue contrast.
+  poolUsed: "var(--ink-color-global-brand-blue-70)",
+  poolPlanned: "var(--ink-color-global-brand-turquoise-70)",
+  poolRemaining: "var(--ink-color-global-brand-blue-20)",
+  interactivePrimaryOnPage: "var(--ink-color-global-text-default)",
+  linkDefault: "var(--ink-color-global-link-default)",
+  focusRing: "var(--ink-color-global-border-focus-light)",
+
+  // Feedback
+  feedbackPositive: "var(--ink-color-global-feedback-positive-strong)",
+  feedbackNegative: "var(--ink-color-global-feedback-negative-strong)",
+  // Ink calls this tone `feedback-notice` — there is no "warning" Tag variant, despite
+  // the .ink-tag--warning class name in components.md.
+  feedbackNotice: "var(--ink-color-global-brand-yellow-80)",
+  feedbackNoticeSubtle: "var(--ink-color-global-brand-yellow-20)",
+  // Notice text ON the subtle notice ground. feedbackNotice (yellow-80) is only
+  // 3.09:1 there, and it is the same in both themes because Ink's brand ramps are
+  // flat — the trap the row-tint comment below describes. yellow-90 is the same
+  // hue at 7.17:1. Use feedbackNotice for borders and icons, where contrast does
+  // not apply, and this for anything a person has to read: a notice nobody can
+  // read is worse than no notice, because it looks like the app said something.
+  feedbackNoticeText: "var(--ink-color-global-brand-yellow-90)",
+
+  // Tints the table/tag recipes call for.
+  rowHover: "var(--ink-color-global-brand-gray-30)",
+
+  // Ink's Dropdown item states, from ink-inputs' DropdownItem/styles.ts. NOT the
+  // brand-gray ramp: the real component uses the surface-lightgray pair, which is
+  // theme-aware where the flat brand ramp is not — the same trap this file's
+  // interactivePrimary and row-tint comments describe.
+  menuItemHover: "var(--ink-color-global-surface-lightgray-hover)",
+  menuItemActive: "var(--ink-color-global-surface-lightgray-active)",
+  // Ink's --ink-dropdown-item-font-color-disabled points at text-disabled, which
+  // upstream is #A7AAAA — the same value as brand-gray-60. This file's tokens.css
+  // carries #CECFCF for that token, a step lighter than upstream, which is what the
+  // textQuiet comment above is working around. Reaching for gray-60 directly gets
+  // the colour Ink's real dropdown renders without editing a shared token that
+  // everything else already depends on at its current value.
+  textDisabled: "var(--ink-color-global-brand-gray-60)",
+  // Row tints, and the SECOND instance of the flat-brand-colour trap the
+  // interactivePrimary comment above describes. Ink's brand-blue ramp does not
+  // adapt, so a row painted with it went near-white under near-white text in dark
+  // mode. The theme-aware pairs live in tokens.css beside the rest of the palette;
+  // see the App row tints block there for why.
+  selectedRow: "var(--app-color-row-selected)",
+  selectionTint: "var(--app-color-selection)",
+  totalRow: "var(--app-color-row-total)",
+  infoSubtle: "var(--ink-color-global-brand-blue-10)",
+  positiveSubtle: "var(--ink-color-global-feedback-positive-subtle)",
+  surfaceTinted: "var(--ink-color-global-brand-brown-20)",
+};
+
+// ---- Legacy aliases -------------------------------------------------------------
+// Views were written against these names. Aliasing rather than renaming every call
+// site keeps this retrofit visual-only — a mechanical rename would churn the two PRs
+// currently in review for reasons unrelated to their content. The mapping is where the
+// real decisions are:
+C.bg = C.surfaceDefault;
+C.surface = C.surfaceDefault;
+C.surfaceAlt = C.surfaceUnderlay;
+C.border = C.borderSubtle;          // was #E3E6E9 — a hairline, so border-subtle
+C.borderStrong = C.borderDefault;   // was #C8CDD3 — an edge weight, so border-default
+C.text = C.textDefault;
+C.textFaint = C.textQuiet;
+// `accent` was one blue doing double duty as both "active" and "link". Every current
+// call site is a link/focus/info accent (nav underline, focus outline, selected tab),
+// so it maps to linkDefault. The follow-up this note asked for has since happened: the
+// selected tab moved to the brand-black role via interactivePrimaryOnPage. A filled
+// active/selected SURFACE would take interactivePrimary itself, which currently has no
+// call site.
+C.accent = C.linkDefault;
+C.accentSoft = C.infoSubtle;
+C.teal = C.feedbackPositive;        // was #00857D — the positive/at-market tone
+C.warn = C.feedbackNotice;          // was #8A5B00 — Ink's notice tone, not a brown
+C.warnSoft = C.feedbackNoticeSubtle;
+
+// Type scale. Numbers, because the app styles inline; each step is annotated with the
+// Ink typography token it corresponds to so drift is visible in review.
+//
+// `md` corrected 13 -> 14: Ink's real table/body size is 14px, and 13 was below every
+// step in Ink's scale. This is the one change here with a visible density cost, and it
+// is the correct value.
+export const FS = {
+  xs: 11,   // caption / eyebrow — below Ink's smallest step, kept for grid density
+  sm: 12,   // --ink-font-body-small
+  md: 14,   // --ink-font-body-default — Ink's real table/body size
+  lg: 16,   // --ink-font-body-large
+  xl: 20,   // --ink-font-heading-2-desktop (weight 500, sans — never serif)
+  xxl: 28,  // --ink-font-heading-1-desktop (weight 400, serif/prominent)
+};
+
+// Ink's radius split: flat (0) for structural surfaces, subtle (4px) for interactive
+// controls. This app previously used a single 6px, which is not an Ink step; 4px is the
+// honest mapping for what RADIUS is actually used on here (chips, buttons, cards).
+export const RADIUS = 4;
+
+/** Ink's elevation scale, for surfaces that float above the page.
+ *
+ *  Named rather than inlined because a hand-written `0 4px 12px rgba(0,0,0,0.12)`
+ *  is the kind of near-miss that reads as almost-Carta: close enough not to be
+ *  noticed in isolation, wrong beside a real Ink surface. `medium` is what
+ *  components.md's .ink-menu recipe calls for.
+ */
+/** Ink's heading scale, as ink-foundations' `Heading variant=` renders it.
+ *
+ *  Section titles in carta-frontend-platform are `heading-3` (Section.tsx), which
+ *  is 16px/28px at weight 500 — NOT the 18px/600 that "looks like a heading" if you
+ *  pick values by eye. The difference is the one between a Carta page and a page
+ *  that resembles one.
+ */
+/** The title of a card or a step. ONE definition, because four of these sit on
+ *  the planner's three screens — "Refresh cohort", "Refresh grant policy", the
+ *  scenario name and "Review + hand off" — and they are peers. Spelled out in four
+ *  places they drifted: same size and weight, but the scenario title carried a
+ *  36px line-height and named its face `Inter var` where the others named `Inter`,
+ *  which is the same typeface by two names and the kind of difference that becomes
+ *  a real one later.
+ *
+ *  16px/600 rather than Ink's heading-3 (16px/500): this app's own card titles have
+ *  always been 600, and matching four titles to each other matters more here than
+ *  matching one of them to a variant nothing else on the page uses.
+ *
+ *  `fontFamily` is explicit so every one of them resolves through SANS rather than
+ *  inheriting whatever the nearest ancestor happens to name.
+ */
+export const CARD_TITLE = {
+  fontSize: 16,
+  lineHeight: "24px",
+  fontWeight: 600,
+  fontFamily: SANS,
+};
+
+export const SHADOW = {
+  small: "var(--ink-elevation-global-shadow-small)",
+  medium: "var(--ink-elevation-global-shadow-medium)",
+  large: "var(--ink-elevation-global-shadow-large)",
+};
+
+/** Injected once at mount: resets and the few rules inline styles can't express. */
+export const GLOBAL_CSS = `
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: ${C.surfaceDefault};
+    color: ${C.textDefault};
+    font-family: ${SANS};
+  }
+  /* The ask box's working indicator. A turn spawns a subprocess and can run for
+     seconds before its first token, and a still "Working…" reads as a hung box.
+     Three dots rather than a spinner: it sits inline with text, so it has to hold
+     a text baseline rather than occupy a box of its own. */
+  @keyframes ctc-dot {
+    0%, 80%, 100% { opacity: 0.25; }
+    40%           { opacity: 1; }
+  }
+  .ctc-dot {
+    animation: ctc-dot 1.4s infinite ease-in-out both;
+  }
+  /* Motion that cannot be turned off is worse than none. The dots hold their
+     mid-state, so the indicator still reads as present without animating. */
+  @media (prefers-reduced-motion: reduce) {
+    .ctc-dot { animation: none; opacity: 0.6; }
+  }
+
+  /* A collapsible section's own control. The browser's marker is a small OS
+     triangle that reads as decoration rather than as something to press, and
+     ::-webkit-details-marker cannot be set from an inline style — which is the
+     whole reason these three rules live here rather than on the element.
+
+     The label is CSS content because it is the ONE piece of text whose value is
+     the element's open state; deriving it in React would mean tracking that
+     state twice, and the copy going stale the first time someone toggles with a
+     keyboard instead of a click. */
+  .ctc-fold > summary { list-style: none; }
+  .ctc-fold > summary::-webkit-details-marker { display: none; }
+  .ctc-fold > summary .ctc-fold-label::after { content: "Hide"; }
+  .ctc-fold:not([open]) > summary .ctc-fold-label::after { content: "Show"; }
+  .ctc-fold > summary .ctc-fold-chevron { transition: transform 120ms ease; }
+  .ctc-fold:not([open]) > summary .ctc-fold-chevron { transform: rotate(-90deg); }
+  @media (prefers-reduced-motion: reduce) {
+    .ctc-fold > summary .ctc-fold-chevron { transition: none; }
+  }
+
+  table { border-collapse: collapse; }
+  th, td { text-align: left; }
+  button { font-family: inherit; cursor: pointer; }
+  select { font-family: inherit; }
+
+  /* Ink's real focus recipe is two-part: recolor the element's own border to
+     link-default AND add a 4px pale-blue ring. A single flat 2px outline in an
+     arbitrary blue (what this file had) only approximates it. */
+  :focus-visible {
+    outline: none;
+    border-color: ${C.linkDefault};
+    box-shadow: 0 0 0 4px ${C.focusRing};
+  }
+
+  /* Suppress the UA's own focus ring on MOUSE focus.
+     The rule above only matches :focus-visible, which a click does not trigger — so a
+     clicked control kept the browser's default near-black outline. Where that outline
+     lands on near-black text (the active tab label) the text vanishes into its own
+     focus ring.
+
+     Engines disagree on :focus-visible, so this is a baseline, not the whole fix: the
+     tab buttons additionally set outline:none inline and draw their own ring from an
+     observed keydown. Keyboard focus elsewhere still gets the Ink ring above.
+
+     NOTE: this whole string is a template literal — never use a backtick in these
+     comments. A backticked CSS property here silently terminates GLOBAL_CSS and the
+     app dies at parse time with a misleading error pointing at another file. */
+  :focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+  }
+  ::selection { background: ${C.selectionTint}; }
+`;

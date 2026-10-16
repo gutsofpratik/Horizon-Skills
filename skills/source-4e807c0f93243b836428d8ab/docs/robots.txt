@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://swaylq.github.io/ruxi-skill/sitemap.xml

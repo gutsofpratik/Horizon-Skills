@@ -1,0 +1,330 @@
+---
+name: output-build-workflow
+description: Implement an Output SDK workflow from a plan document. Use when the user asks to build, implement, or code a workflow from an existing plan, or after output-plan-workflow has produced a plan and the user is ready to build.
+---
+
+Your task is to implement an Output.ai workflow based on a provided plan document.
+
+The workflow directory is provided as an argument (the workflow directory path). The workflow skeleton should already have been created there; if it has not, create it first.
+
+Please read the plan file and implement the workflow according to its specifications.
+
+Use the todo tool to track your progress through the implementation process.
+
+# Implementation Rules
+
+## Overview
+
+Implement the workflow described in the plan document, following Output SDK patterns and best practices.
+
+<pre_flight_check>
+  EXECUTE: Claude Skill: `output-meta-pre-flight`
+</pre_flight_check>
+
+<process_flow>
+
+<step number="1" name="plan_analysis" subagent="workflow-context-fetcher">
+
+### Step 1: Plan Analysis
+
+Read and understand the plan document.
+
+1. Read the plan file from the provided plan file path
+2. Identify the workflow name, description, and purpose
+3. Extract input and output schema definitions
+4. List all required steps and their relationships
+5. Note any LLM-based steps that require prompt templates
+6. Understand error handling and retry requirements
+
+</step>
+
+<step number="2" name="workflow_implementation" subagent="workflow-quality">
+
+### Step 2: Workflow Implementation
+
+Update `workflow.ts` in the workflow directory with the workflow definition.
+
+<implementation_checklist>
+  - Import required dependencies (workflow, z from '@outputai/core')
+  - Define inputSchema based on plan specifications
+  - Define outputSchema based on plan specifications
+  - Import step functions from steps.ts
+  - Implement workflow function with proper orchestration
+  - Handle conditional logic if specified in plan
+  - Add proper error handling
+  - When catching a specific step or evaluator error, use `hasErrorType(error, ErrorClass)` instead of `instanceof` (see `output-error-try-catch`)
+</implementation_checklist>
+
+<workflow_template>
+```typescript
+import { workflow, z } from '@outputai/core';
+import { stepName } from './steps.js';
+
+const inputSchema = z.object( {
+  // Define based on plan
+} );
+
+const outputSchema = z.object( {
+  // Define based on plan
+} );
+
+export default workflow( {
+  name: 'workflow-name-from-plan',
+  description: 'Description from plan',
+  inputSchema,
+  outputSchema,
+  fn: async input => {
+    // Implement orchestration logic from plan
+    const result = await stepName( input );
+    return { result };
+  }
+} );
+```
+</workflow_template>
+
+</step>
+
+<step number="3" name="steps_implementation" subagent="workflow-quality">
+
+### Step 3: Steps Implementation
+
+Update `steps.ts` in the workflow directory with all step definitions from the plan.
+
+<implementation_checklist>
+  - Import required dependencies (step, z from '@outputai/core')
+  - Implement each step with proper schema validation
+  - Add error handling and retry logic as specified
+  - Ensure step names match plan specifications
+  - Add descriptive comments for complex logic
+</implementation_checklist>
+
+<step_template>
+```typescript
+import { step, z } from '@outputai/core';
+
+export const stepName = step( {
+  name: 'stepName',
+  description: 'Description from plan',
+  inputSchema: z.object( {
+    // Define based on plan
+  } ),
+  outputSchema: z.object( {
+    // Define based on plan
+  } ),
+  fn: async input => {
+    // Implement step logic from plan
+    return output;
+  }
+} );
+```
+</step_template>
+
+</step>
+
+<step number="3.5" name="evaluators_implementation" subagent="workflow-quality">
+
+### Step 3.5: Evaluators Implementation (if needed)
+
+If the plan includes evaluator functions, implement them in `evaluators.ts` in the workflow directory.
+
+<decision_tree>
+  IF plan_includes_evaluators:
+    CREATE evaluators.ts
+    IMPLEMENT evaluator functions per plan
+  ELSE:
+    SKIP to step 4
+</decision_tree>
+
+<implementation_checklist>
+  - Import required dependencies (evaluator, z, result types from '@outputai/core')
+  - Import `generateText` and `aiSdk` from `@outputai/llm` if using LLM-powered evaluators
+  - Implement each evaluator with proper schema validation
+  - Use appropriate result types (EvaluationBooleanResult, EvaluationNumberResult, EvaluationStringResult)
+  - Include confidence scores (0.0-1.0)
+  - Add reasoning for transparency
+  - All imports use .js extension
+  - Consider offline eval tests for dataset-driven verification (see `output-dev-eval-testing` skill)
+</implementation_checklist>
+
+<evaluator_template>
+```typescript
+import { evaluator, z, EvaluationBooleanResult } from '@outputai/core';
+
+export const evaluateName = evaluator( {
+  name: 'evaluate_name',
+  description: 'Description from plan',
+  inputSchema: z.object( {
+    // Define based on plan
+  } ),
+  fn: async input => {
+    // Implement evaluation logic from plan
+    return new EvaluationBooleanResult( {
+      value: true,
+      confidence: 0.95,
+      reasoning: 'Explanation of evaluation'
+    } );
+  }
+} );
+```
+</evaluator_template>
+
+</step>
+
+<step number="4" name="prompt_templates" subagent="workflow-prompt-writer">
+
+### Step 4: Prompt Templates (if needed)
+
+If the plan includes LLM-based steps, create prompt templates in the `prompts/` subdirectory of the workflow directory.
+
+<decision_tree>
+  IF plan_includes_llm_steps:
+    CREATE prompt_templates
+    UPDATE steps.ts to use loadPrompt and generateText
+  ELSE:
+    SKIP to step 6
+</decision_tree>
+
+<llm_step_template>
+```typescript
+import { step, z } from '@outputai/core';
+import { generateText } from '@outputai/llm';
+
+export const llmStep = step( {
+  name: 'llmStep',
+  description: 'LLM-based step',
+  inputSchema: z.object( {
+    param: z.string()
+  } ),
+  outputSchema: z.string(),
+  fn: async ( { param } ) => {
+    const { result } = await generateText( {
+      prompt: 'prompt_name@v1',
+      variables: { param }
+    } );
+    return result;
+  }
+} );
+```
+</llm_step_template>
+
+<prompt_file_template>
+```
+---
+provider: anthropic
+# current as of 2026-05-04 — run output-dev-model-selection for the latest
+model: claude-sonnet-4-6
+temperature: 0.7
+---
+
+<assistant>
+You are a helpful assistant.
+</assistant>
+
+<user>
+
+</user>
+```
+</prompt_file_template>
+
+</step>
+
+<step number="5" name="readme_update">
+
+### Step 5: README Update
+
+Update `README.md` in the workflow directory with workflow-specific documentation.
+
+<documentation_requirements>
+  - Update workflow name and description
+  - Document input schema with examples
+  - Document output schema with examples
+  - Explain each step's purpose
+  - Provide usage examples
+  - Document any prerequisites or setup requirements
+  - Include testing instructions
+</documentation_requirements>
+
+</step>
+
+<step number="6" name="scenario_creation">
+
+### Step 6: Scenario File Creation
+
+Create at least one scenario file in the `scenarios/` subdirectory of the workflow directory for testing the workflow.
+
+<scenario_requirements>
+  - Create `scenarios/` directory if it doesn't exist
+  - Create `test_input.json` with valid example input matching the inputSchema
+  - Input values should be realistic and demonstrate the workflow's purpose
+  - JSON must be valid and parseable
+</scenario_requirements>
+
+<scenario_template>
+```json
+{
+  // Populate with example values matching inputSchema
+  // Use realistic test data that demonstrates the workflow
+}
+```
+</scenario_template>
+
+<example>
+For a workflow with inputSchema:
+```typescript
+z.object( {
+  topic: z.string(),
+  maxLength: z.number().optional()
+} )
+```
+
+Create `scenarios/test_input.json`:
+```json
+{
+  "topic": "The history of artificial intelligence",
+  "maxLength": 500
+}
+```
+</example>
+
+</step>
+
+<step number="7" name="validation" subagent="workflow-quality">
+
+### Step 7: Implementation Validation
+
+Verify the implementation is complete and correct.
+
+<validation_checklist>
+  - All steps from plan are implemented
+  - Input/output schemas match plan specifications
+  - Workflow orchestration logic is correct
+  - Error handling is in place
+  - LLM prompts are created (if needed)
+  - Evaluators are implemented (if specified in plan)
+  - Evaluators use correct result types and confidence scores
+  - README is updated with accurate information
+  - Code follows Output SDK patterns
+  - TypeScript types are properly defined
+  - Scenario file exists with valid example input
+  - Offline eval tests created (if applicable)
+</validation_checklist>
+
+</step>
+
+<step number="8" name="post_flight_check">
+
+### Step 8: Post-Flight Check
+
+Verify the implementation is ready for use.
+
+<post_flight_check>
+  EXECUTE: Claude Skill: `output-meta-post-flight`
+</post_flight_check>
+
+</step>
+
+</process_flow>
+
+---- START ----
+
+Use the workflow name, workflow directory, and plan file path provided as arguments, along with any additional instructions the user provided.

@@ -1,0 +1,6 @@
+{
+  "repository": "crowdsecurity/crowdsec-skill",
+  "ref": "8802dbe68a0552fe55dc605b6278f57e57578526",
+  "path": "skills/crowdsec-service-api/SKILL.md",
+  "source": "https://github.com/crowdsecurity/crowdsec-skill.git"
+}

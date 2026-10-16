@@ -1,0 +1,6 @@
+{
+  "repository": "anthropics/claude-plugins-official",
+  "ref": "main",
+  "path": "plugins/math-olympiad/skills/math-olympiad/SKILL.md",
+  "source": "https://github.com/anthropics/claude-plugins-official/tree/main/plugins/math-olympiad"
+}

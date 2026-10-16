@@ -1,0 +1,73 @@
+---
+name: output-meta-pre-flight
+description: Pre-flight validation checks for Output SDK workflow operations. Ensures conventions are followed, requirements are gathered, and quality gates are passed before workflow execution.
+allowed-tools: [Read]
+---
+
+# Pre-Flight Rules for Output SDK Workflows
+
+## Execution Requirements
+
+- **CRITICAL**: For any step that specifies a subagent in the `subagent=""` XML attribute, you MUST use the specified subagent to perform the instructions for that step
+- Process all XML blocks sequentially and completely
+- Execute every numbered step in the process_flow EXACTLY as specified
+
+## Output SDK Knowledge Check
+Ensure you have a deep understanding of the Output SDK and its capabilities. If not, use Claude Skill: `output-meta-project-context` and read it carefully.
+
+## Output SDK Conventions Check
+
+Before proceeding with any workflow operation, verify:
+
+- **ES Modules**: All imports MUST use `.js` extension for ESM modules
+- **HTTP Client**: NEVER use axios directly - always use @outputai/core/http wrapper
+- **HTTP Bodies**: Consume non-HEAD response bodies with `.json()`/`.text()` or cancel unused bodies with
+  `response.body?.cancel()`
+- **LLM Client**: NEVER use a direct llm call - always use @outputai/llm wrapper
+- **Worker Restarts**: `npx output dev` auto-restarts the worker on file changes; if the worker runs detached, restart it manually with `docker restart <project>-worker-1`
+
+## Requirements Gathering Strategy
+
+### Smart Defaults Application
+When information is not explicitly provided, apply these defaults:
+- **Retry Policies**: 3 attempts with exponential backoff (1s initial, 10s max)
+- **Model selection**: Run [`output-dev-model-selection`](../output-dev-model-selection/SKILL.md) to pick the current default for the chosen provider. Don't pin a specific model ID here — the listing changes faster than the docs.
+- **Error Handling**: ApplicationFailure patterns with appropriate error types
+- **Performance**: Optimize for clarity and maintainability over raw speed
+- **Timeouts**: 30 seconds for activities, 5 minutes for workflows
+
+### Critical Information Requirements
+Only stop to ask for clarification on:
+- Ambiguous input/output structures that cannot be inferred from context
+- Specific API keys or services not commonly used in the project
+- Non-standard error handling or recovery requirements
+- Complex orchestration patterns requiring specific sequencing
+- External dependencies not already in the project
+
+## Template Processing Rules
+
+- Use exact templates as provided in each step
+- Replace all template variables with actual values:
+  - `{workflow_name}` - The workflow being planned
+  - `{project_root}` - Root project directory path
+  - `{requirements}` - User-provided requirements
+  - `{current_date}` - Current date in YYYY-MM-DD format
+  - `{sdk_version}` - Current Output SDK version
+
+## Quality Gates
+
+Before proceeding past pre-flight:
+1. Confirm all required context is available
+2. Verify understanding of the workflow's purpose
+3. Check for existing similar workflows to use as patterns
+4. Ensure Output SDK conventions are understood
+5. Validate that necessary subagents are available
+
+## Plan Creation Rules
+
+- All complex tasks should be tracked in a workflow plan file
+- These files should be created at .outputai/plans directory.
+- If `.outputai/plans` directory does not exist, create it.
+- Ensure the plan folder is named with the date, then the workflow name, then the task name. e.g. 2025_12_16_simple_sum_workflow_creation_plan/PLAN.md
+- Track the implementation progress of any plan in a TASK file in the plan folder. e.g. 2025_12_16_simple_sum_workflow_creation_plan/TASK.md
+- Use markdown todo list to track the progress of the plan. e.g

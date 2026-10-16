@@ -1,0 +1,134 @@
+# Install — Console enrollment
+
+Canonical docs: <https://docs.crowdsec.net/docs/next/getting_started/post_installation/console> · Console app: <https://app.crowdsec.net>
+
+The Console is the SaaS view on top of CAPI: dashboards, multi-engine overview,
+managed blocklists, and **centralized allowlists pushed to every enrolled
+engine**. Enrollment is of the **engine/LAPI** — bouncers are not enrolled
+separately; they appear in the Console *through* their LAPI.
+
+## 1 — Enroll the engine
+
+Get an enrollment key from <https://app.crowdsec.net> (Security Engines → Enroll),
+then on the engine:
+
+```bash
+sudo cscli console enroll YOUR-ENROLL-KEY
+sudo systemctl reload crowdsec        # required for it to take effect
+```
+
+**Enrollment is two-step**: this command registers the engine, then you must
+**accept the instance in the Console webapp** — until you click Accept it stays
+pending and no data flows. This is the #1 "I enrolled but nothing shows up".
+
+Useful flags (from `cscli console enroll --help`):
+
+| Flag | Use |
+|---|---|
+| `--name <instance_name>` | Label this engine in the Console (default is the machine ID — set this on multi-engine fleets). |
+| `--tags <t> --tags <t>` | Group/filter engines in the Console. |
+| `--enable <opt>` / `--disable <opt>` | Set sharing options at enroll time (see options below), e.g. `--disable context`. |
+| `--overwrite` | Re-enroll an already-enrolled engine (e.g. moving it to another Console org). |
+| `--quick` | Non-interactive enroll. |
+
+Enrolling requires a working **CAPI registration** — the Console rides on CAPI.
+If `online_api_credentials.yaml` is missing, `cscli capi register` then reload
+*before* enrolling.
+
+## 2 — Console options (the part users get wrong)
+
+`cscli console status` shows five toggles. Default state on a fresh
+enrolled engine (`cscli console enroll` switches on `manual`, `tainted` and `context`; untested here):
+
+| Option | Default | What it does |
+|---|---|---|
+| `custom` | ✅ on | Forward alerts from your custom scenarios |
+| `tainted` | ✅ on | Forward alerts from tainted (locally modified) scenarios |
+| `manual` | ✅ on | Forward your manual `cscli decisions add` |
+| `context` | ✅ on | Forward alert context (richer detail, more data) |
+| `console_management` | ❌ **off** | **Receive** decisions/allowlists *from* the Console |
+
+The trap: **`console_management` is off by default**. Centralized blocklists and
+**Console-managed allowlists only push down to the engine once it is enabled**:
+
+```bash
+sudo cscli console enable console_management
+sudo systemctl reload crowdsec
+```
+
+These map to `share_*` keys in `/etc/crowdsec/console.yaml`. A never-enrolled
+engine falls back to `share_custom: true`, `share_tainted: true`,
+`share_manual_decisions: false`, `share_context: false`. Use
+`cscli console enable/disable <opt>`, not hand edits. `all` is a valid target
+(`cscli console enable all`).
+
+## 3 — Verify enrollment
+
+```bash
+sudo cscli console status     # the five toggles above
+sudo cscli capi status        # connectivity — expect:
+                              #   "Sharing signals is enabled"
+                              #   "Pulling community blocklist is enabled"
+                              #   "Pulling blocklists from the console is enabled"
+```
+
+`cscli capi status` is the **connectivity/enrollment** check (it authenticates
+to `api.crowdsec.net`); `cscli console status` is the **feature-flag** check.
+You usually want both. Then confirm the instance shows (and is Accepted) in the
+Console webapp.
+
+If you enabled `console_management`, confirm allowlists actually sync: add one
+in the Console UI, then within a poll cycle:
+
+```bash
+sudo cscli allowlists list    # Console-pushed entries show "Managed by Console: true"
+```
+
+See [../configure/allowlists.md](../configure/allowlists.md) for the
+local-vs-Console allowlist distinction.
+
+## Per-environment notes
+
+| Env | Enroll via |
+|---|---|
+| systemd / bare-metal | `sudo cscli console enroll …` then `systemctl reload crowdsec` |
+| Docker | `ENROLL_KEY` (and `ENROLL_INSTANCE_NAME`/`ENROLL_TAGS`) env vars on the crowdsec container, **or** `docker exec crowdsec cscli console enroll …` then restart the container. Enrollment writes `console.yaml` + `online_api_credentials.yaml` under `/etc/crowdsec` — persist that path or a recreate un-enrolls you (see pitfall). |
+| Kubernetes | `config.console.enroll_key` (and name/tags) in the Helm chart values; the LAPI pod enrolls on start |
+
+## Pitfalls
+
+- **Forgot to Accept in the webapp** → enrolled but no data. Always finish step 1
+  in the UI.
+- **Token reuse across engines** without `--name` → every engine collides under
+  the machine-ID default and they're indistinguishable in the Console. Set
+  `--name` per engine.
+- **Docker recreate un-enrolls you**: interactive `cscli console enroll` writes
+  its state under `/etc/crowdsec`. If that path isn't a persisted volume, a
+  `docker compose down && up` (or image upgrade) recreates the container and drops
+  the enrollment — you re-enroll and re-Accept. Persist `/etc/crowdsec` (see
+  [../install/docker.md](../install/docker.md)), or use the `ENROLL_KEY` env
+  instead: it re-runs on every boot and is recreate-safe.
+- **Egress**: the engine must reach `api.crowdsec.net` (HTTPS). Behind a proxy,
+  set the proxy env for the crowdsec service; behind egress filtering, allow
+  that host. `cscli capi status` failing right after enroll is almost always
+  egress or **clock skew** (TLS) — check `timedatectl`.
+- **Expecting blocklists without `console_management`** → see §2; it's off by
+  default.
+- **Bouncer "enrollment"**: there is no separate bouncer enroll command;
+  register bouncers normally with `cscli bouncers add` and they surface in the
+  Console via the enrolled LAPI.
+
+## Managing the Console programmatically
+
+This page covers **enrolling** an engine. To manage Console objects by API —
+create blocklists/allowlists, push IPs, wire firewall integrations, pull
+remediation metrics — use the **`crowdsec-service-api`** skill (the premium cloud
+Service API at `admin.api.crowdsec.net`). Enroll here first; a cloud list only
+reaches this engine once it's enrolled, subscribed there, and has
+`console_management` enabled (§2).
+
+## Next step
+
+Confirm detection + sharing end-to-end with
+[../operate/health-check.md](../operate/health-check.md) — a triggered test
+alert should appear in `cscli alerts list` *and* in the Console within a minute.

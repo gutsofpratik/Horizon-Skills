@@ -1,0 +1,6 @@
+{
+  "repository": "grafana/ai-marketplace",
+  "ref": "12be5634a492f73c189d466c5449d09b853ad7a4",
+  "path": "plugins/grafana-assistant/skills/grafana-assistant-cli/SKILL.md",
+  "source": "https://github.com/grafana/ai-marketplace.git"
+}

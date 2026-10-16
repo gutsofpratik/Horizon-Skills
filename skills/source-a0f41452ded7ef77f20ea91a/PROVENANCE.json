@@ -1,0 +1,6 @@
+{
+  "repository": "cockroachdb/claude-plugin",
+  "ref": "6c96c6394a61f366e8ec1b7cec2281e97507cbff",
+  "path": "skills/cockroachdb-onboarding-and-migrations/molt-verify/SKILL.md",
+  "source": "https://github.com/cockroachdb/claude-plugin.git"
+}

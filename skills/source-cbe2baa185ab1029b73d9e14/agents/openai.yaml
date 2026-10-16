@@ -1,0 +1,16 @@
+# UI metadata, invocation policy and tool dependencies for ChatGPT and Codex.
+# Claude ignores this file; it reads SKILL.md frontmatter only.
+interface:
+  display_name: "Prompt Engineer"
+  short_description: "Writes, revises and migrates prompts, with the tests to prove they work"
+  brand_color: "#2F6F4E"
+  default_prompt: "Use the prompt-engineer skill for this."
+
+policy:
+  # Implicit invocation stays on. The failure this skill is built around is a
+  # user who does not think of their task as a prompting task, so requiring an
+  # explicit $mention would mean it never fires when it is most needed.
+  allow_implicit_invocation: true
+
+dependencies:
+  tools: []

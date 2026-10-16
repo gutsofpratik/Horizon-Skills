@@ -1,0 +1,6 @@
+{
+  "repository": "grafana/ai-marketplace",
+  "ref": "6c28ba1961d502d82301cbd64d2322e6e960477c",
+  "path": "plugins/grafana-cloud-mcp/skills/grafana-cloud-mcp-tools/SKILL.md",
+  "source": "https://github.com/grafana/ai-marketplace.git"
+}

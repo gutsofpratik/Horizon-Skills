@@ -1,0 +1,6 @@
+{
+  "repository": "neondatabase/agent-skills",
+  "ref": "default",
+  "path": "evals/neon-postgres-egress-optimizer/.claude/skills/score-eval/SKILL.md",
+  "source": "https://github.com/neondatabase/agent-skills"
+}

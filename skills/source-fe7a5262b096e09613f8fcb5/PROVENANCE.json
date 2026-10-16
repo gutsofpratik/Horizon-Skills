@@ -1,0 +1,6 @@
+{
+  "repository": "confluentinc/agent-skills",
+  "ref": "f3d95b7e6855b690b7670ecee033404e082ab169",
+  "path": "skills/confluent-skill-reviewer/SKILL.md",
+  "source": "https://github.com/confluentinc/agent-skills.git"
+}

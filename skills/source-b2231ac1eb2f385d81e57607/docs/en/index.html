@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>danshari.skill (断舍离.skill) — the first skill that tells you to delete skills</title>
+<meta name="description" content="danshari.skill — 断舍离.skill audits every agent skill you have installed and removes the ones your model already knows, your harness already ships, and your MCP servers already cover. Three-way triage, blind-test evidence, archive with one-command restore, never rm. Claude Code / OpenClaw / Codex / Hermit. MIT, zero dependencies.">
+<meta name="keywords" content="danshari.skill,danshari-skill,断舍离.skill,Claude Code skills,agent skills cleanup,skill audit,remove skills,token optimization,context engineering,AI agent">
+<meta name="author" content="swaylq">
+<meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1a18" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://swaylq.github.io/danshari-skill/en/">
+<link rel="alternate" hreflang="zh-Hans" href="https://swaylq.github.io/danshari-skill/">
+<link rel="alternate" hreflang="en" href="https://swaylq.github.io/danshari-skill/en/">
+<link rel="alternate" hreflang="x-default" href="https://swaylq.github.io/danshari-skill/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="zh_CN">
+<meta property="og:site_name" content="danshari.skill">
+<meta property="og:title" content="danshari.skill (断舍离.skill) — the first skill that tells you to delete skills">
+<meta property="og:description" content="The whole ecosystem is addition. Nobody does subtraction. danshari.skill audits every skill you have installed and archives the ones your model, harness, or MCP servers already cover — blind-test evidence, one-command restore, never rm.">
+<meta property="og:url" content="https://swaylq.github.io/danshari-skill/en/">
+<meta property="og:image" content="https://swaylq.github.io/danshari-skill/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="danshari.skill — the first skill that tells you to delete skills">
+<meta name="twitter:description" content="Audit every skill you have installed. Remove what the model already knows, the harness already ships, and MCP already covers.">
+<meta name="twitter:image" content="https://swaylq.github.io/danshari-skill/assets/og.png">
+<link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "danshari.skill",
+      "alternateName": ["断舍离.skill", "danshari-skill", "danshari skill"],
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS, Linux, Windows",
+      "url": "https://swaylq.github.io/danshari-skill/en/",
+      "downloadUrl": "https://github.com/swaylq/danshari-skill",
+      "codeRepository": "https://github.com/swaylq/danshari-skill",
+      "programmingLanguage": ["Python", "Shell", "Markdown"],
+      "license": "https://opensource.org/licenses/MIT",
+      "description": "Audits every agent skill you have installed and archives the ones your current model, harness, or MCP servers already cover. Three-way triage, five questions, blind-test evidence, one-command restore, never rm.",
+      "author": { "@type": "Person", "name": "swaylq", "url": "https://github.com/swaylq" },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is danshari.skill?",
+          "acceptedAnswer": { "@type": "Answer", "text": "An agent skill whose job is to audit the other skills you have installed — finding the ones your current model already knows how to do, your harness already ships as a built-in, or your MCP servers already cover, and archiving them so you stop paying their per-turn description tokens." }
+        },
+        {
+          "@type": "Question",
+          "name": "Why delete skills at all? What is the harm in keeping them?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Every installed skill puts its name and description into the system prompt on every single turn — a standing cost. Descriptions also compete for triggers, and a wrong trigger is worse than no skill at all. And skills rot: hard-coded paths, APIs and model names expire, after which each trigger actively misleads." }
+        },
+        {
+          "@type": "Question",
+          "name": "Will it delete something I actually need?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Nothing is deleted. You review the verdict table line by line and can veto any of it. Knowledge skills — private facts, accounts, internal conventions — are a protected red line. Every removal is a move into an archive directory with a MANIFEST, restorable with one command. rm is never executed." }
+        },
+        {
+          "@type": "Question",
+          "name": "When should I run an audit?",
+          "acceptedAnswer": { "@type": "Answer", "text": "After a model upgrade, after a major harness release, after connecting new MCP servers, or 90 days since the last audit. Model release day is skill decluttering day." }
+        },
+        {
+          "@type": "Question",
+          "name": "Which agents does it support?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Any host that reads SKILL.md — Claude Code, OpenClaw, Codex, Hermit. If your skills live somewhere non-standard, point tools/inventory.py --root at the directory." }
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="shell topbar-in">
+    <a class="wordmark" href="/danshari-skill/en/">danshari<span class="dot">.</span>skill</a>
+    <nav class="topnav">
+      <a class="hide-sm" href="#cost">Why</a>
+      <a class="hide-sm" href="#method">How it judges</a>
+      <a class="hide-sm" href="#trust">Safety</a>
+      <a href="#install">Install</a>
+      <a href="../">中文</a>
+      <a href="https://github.com/swaylq/danshari-skill">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <section class="shell hero">
+    <p class="eyebrow">断舍离.skill · MIT · zero dependencies</p>
+    <h1>The first skill that tells you to delete skills<span class="dot">.</span></h1>
+    <p class="lede">
+      The whole ecosystem is addition — awesome lists collect thousands of skills, single repos ship three hundred.
+      <strong>Nobody does subtraction.</strong>
+      But skills are not free: every one you install bills you tokens on every turn, and each time the model
+      gets a generation stronger, another batch of them turns from asset into liability.
+    </p>
+
+    <blockquote class="pull">
+      danshari.skill cuts what teaches the model to do what it already knows,<br>
+      and keeps what tells the model what it could not possibly know.
+    </blockquote>
+
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/swaylq/danshari-skill">View on GitHub →</a>
+      <a class="btn btn-ghost" href="#demo">See a real audit</a>
+    </div>
+
+    <div class="copyline">
+      <span class="scroll"><code id="install-cmd">git clone https://github.com/swaylq/danshari-skill.git ~/.claude/skills/danshari-skill</code></span>
+      <button type="button" data-copy="#install-cmd">Copy</button>
+    </div>
+
+    <dl class="stats">
+      <div class="stat"><dt>Demo audit</dt><dd>12 → 5</dd></div>
+      <div class="stat"><dt>Description tax</dt><dd class="cut">−66<span class="unit">%</span></dd></div>
+      <div class="stat"><dt>Dependencies</dt><dd>0</dd></div>
+      <div class="stat"><dt>rm calls made</dt><dd>0</dd></div>
+    </dl>
+  </section>
+
+  <section class="section" id="cost">
+    <div class="shell">
+      <div class="section-head">
+        <p class="kicker">Why subtract</p>
+        <h2>Skills are not free — you pay three costs</h2>
+        <p>There is always a reason to install one, and never an occasion to remove one. So the directory only grows, while the model keeps getting stronger.</p>
+      </div>
+      <div class="cards">
+        <article class="card">
+          <h3>Token tax</h3>
+          <p>Its name and description enter the system prompt on <strong>every turn</strong>. A dozen skills is two thousand tokens per turn, billed whether or not today's task needs any of them.</p>
+        </article>
+        <article class="card">
+          <h3>Mis-triggering</h3>
+          <p>Descriptions compete for the same work. One wrong trigger is worse than having no skill at all — the model marches off confidently holding an obsolete manual.</p>
+        </article>
+        <article class="card">
+          <h3>Rot</h3>
+          <p>Hard-coded paths, APIs and model names expire. A rotten skill misleads every time it fires, and it will never tell you that it has gone stale.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="demo">
+    <div class="shell">
+      <div class="section-head">
+        <p class="kicker">What it looks like</p>
+        <h2>Not "delete a few that look untidy"</h2>
+        <p>Every skill is tried against the model, harness and MCP servers you are running <em>right now</em>, and judged on evidence.</p>
+      </div>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="lamp"></span><span class="lamp"></span><span class="lamp"></span>
+          <span class="path">~/.claude/skills — danshari.skill</span>
+        </div>
+<pre><span class="u">you       ❯</span> new model just landed — declutter my skills
+
+<span class="a">danshari  ❯</span> Environment: claude-fable-5 · Claude Code (built-in search /
+            subagents / auto-memory / plan mode) · MCP ×3 (slack /
+            github / playwright)
+
+            Inventory: <span class="hi">12 skills, ~2,160 tokens/turn of description tax</span>.
+
+            Blind test on think-harder: a subagent without it debugged a
+            real race condition at equal quality → the model has
+            internalised this. 210 tokens/turn paid for nothing.
+
+            Verdicts: <span class="cut">✂️ remove ×6</span> · 🔧 trim ×1 · 🔗 merge ×1 ·
+            ⏳ probation ×1 · <span class="keep">✅ keep ×2</span>
+            Evidence per line in the report — execute?
+
+<span class="u">you       ❯</span> go ahead, but keep the selector script inside browser-scrape
+
+<span class="a">danshari  ❯</span> Understood: script extracted to scripts/ first, shell archived after.
+            Archived 7 (restorable), trimmed 1 (58 lines → 9), merged 1 pair.
+
+            <span class="hi">12 → 5 skills, ~1,425 tokens/turn saved (−66%).</span>
+            Restore: tools/archive.sh --restore &lt;name&gt;</pre>
+      </div>
+      <p style="margin-top:var(--s-5);font-size:var(--text-sm);color:var(--ink-muted)">
+        Full report with the evidence behind every verdict:
+        <a href="https://github.com/swaylq/danshari-skill/blob/main/examples/2026-08-17-demo/report.md">examples/2026-08-17-demo/report.md</a>
+      </p>
+    </div>
+  </section>
+
+  <section class="section" id="method">
+    <div class="shell">
+      <div class="section-head">
+        <p class="kicker">How it judges</p>
+        <h2>Triage by type, prove with five questions, confirm by blind test</h2>
+        <p>"Stronger models make skills useless" is only true of the first type. A cleanup that cannot tell the types apart deletes exactly the wrong ones.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Type</th><th>Definition</th><th>Fate</th></tr></thead>
+          <tbody>
+            <tr><td>Capability</td><td>General method — teaches the model how to think or work</td><td class="verdict">Model upgrades obsolete it — the audit's focus</td></tr>
+            <tr><td>Environment</td><td>Wraps a tool, or fills a gap in the harness</td><td class="verdict">Harness and MCP evolution replace it</td></tr>
+            <tr><td>Knowledge</td><td>Private facts: accounts, paths, internal conventions</td><td>Never obsoleted by a stronger model — protected</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="asks">
+        <div class="ask"><span>Q1</span>Model already internalised it?</div>
+        <div class="ask"><span>Q2</span>Harness ships it built-in?</div>
+        <div class="ask"><span>Q3</span>An MCP server took it over?</div>
+        <div class="ask"><span>Q4</span>Absorbed by / duplicating another?</div>
+        <div class="ask"><span>Q5</span>Has it rotted?</div>
+      </div>
+
+      <div class="section-head" style="margin-top:var(--s-16)">
+        <h2 style="font-size:var(--text-xl)">Five verdicts, not two</h2>
+        <p>Before any capability skill is removed, a subagent that does <strong>not</strong> load it attempts the skill's most typical task. Only equal quality justifies the cut. Evidence, not intuition.</p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Verdict</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>✂️ Remove</td><td>Evidence is conclusive → archived (restorable). Never <code>rm</code>.</td></tr>
+            <tr><td>🔧 Trim</td><td>Mixed type: drop the obsolete lecture, keep the valuable facts — 200 lines often become 10.</td></tr>
+            <tr><td>🔗 Merge</td><td>Duplicates fighting over the same triggers, folded into the better one.</td></tr>
+            <tr><td>⏳ Probation</td><td>Evidence insufficient — not decided by force, flagged for the next audit.</td></tr>
+            <tr><td>✅ Keep</td><td>It earns back its own token tax.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="trust">
+    <div class="shell">
+      <div class="section-head">
+        <p class="kicker">Safety</p>
+        <h2>A tool that touches your skills directory is only as good as its safety design</h2>
+      </div>
+      <ul class="checks">
+        <li><span class="tick">✓</span><span><b>Never rm</b> — every removal is a move into an archive directory. <code>--restore</code> brings it back in one command; the MANIFEST keeps the trail.</span></li>
+        <li><span class="tick">✓</span><span><b>Nothing without confirmation</b> — you see the verdict table first, and can veto line by line.</span></li>
+        <li><span class="tick">✓</span><span><b>Knowledge skills are a red line</b> — private facts, team policy, referenced scripts: kept no matter how strong the evidence.</span></li>
+        <li><span class="tick">✓</span><span><b>Frisked before archiving</b> — obsolete skills often bury facts that are not obsolete (URLs, accounts, scripts). Those are extracted first.</span></li>
+        <li><span class="tick">✓</span><span><b>Every verdict carries evidence</b> — the blind-test record, the named replacement (which built-in, which MCP server), proof of rot. Assertions don't count.</span></li>
+        <li><span class="tick">✓</span><span><b>Self-judgment clause</b> — danshari itself costs you ~180 tokens/turn and has to earn that back. If your model audits just as well without it, declutter danshari too.</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="install">
+    <div class="shell">
+      <div class="section-head">
+        <p class="kicker">Install</p>
+        <h2>One clone, any host</h2>
+        <p>Once installed, just say "declutter my skills" or "new model, clean up the skills" in your agent.</p>
+      </div>
+
+      <div class="copyline">
+        <span class="scroll"><code id="install-cmd-2">git clone https://github.com/swaylq/danshari-skill.git ~/.claude/skills/danshari-skill</code></span>
+        <button type="button" data-copy="#install-cmd-2">Copy</button>
+      </div>
+
+      <div class="table-wrap hosts">
+        <table>
+          <thead><tr><th>Host</th><th>Target path</th></tr></thead>
+          <tbody>
+            <tr><td>Claude Code</td><td><code>~/.claude/skills/danshari-skill</code></td></tr>
+            <tr><td>OpenClaw</td><td><code>~/.openclaw/skills/danshari-skill</code></td></tr>
+            <tr><td>Codex</td><td><code>~/.codex/skills/danshari-skill</code></td></tr>
+            <tr><td>Hermit</td><td><code>~/.hermit/skills/danshari-skill</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="margin-top:var(--s-6);font-size:var(--text-sm);color:var(--ink-muted);max-width:var(--measure)">
+        Only after the methodology? Feed
+        <a href="https://github.com/swaylq/danshari-skill/blob/main/SKILL.md">SKILL.md</a> and
+        <a href="https://github.com/swaylq/danshari-skill/blob/main/references/rubric.md">references/rubric.md</a>
+        straight to your agent.
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="shell">
+    <div class="foot-line">
+      <a href="https://github.com/swaylq/danshari-skill">GitHub</a>
+      <a href="https://github.com/swaylq/danshari-skill/blob/main/SKILL.md">SKILL.md</a>
+      <a href="https://github.com/swaylq/danshari-skill/blob/main/references/rubric.md">Rubric</a>
+      <a href="https://github.com/swaylq/danshari-skill/blob/main/examples/2026-08-17-demo/report.md">Demo audit</a>
+      <a href="../">中文</a>
+      <a href="https://swaylq.github.io/">More open source</a>
+      <span style="color:var(--ink-faint)">MIT © <a href="https://github.com/swaylq">swaylq</a></span>
+    </div>
+    <p class="closing">
+      The whole ecosystem is addition. danshari.skill is subtraction — <em>the more it adds, the more necessary subtraction becomes.</em>
+    </p>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll('[data-copy]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var text = document.querySelector(btn.dataset.copy).textContent.trim();
+    navigator.clipboard.writeText(text).then(function () {
+      var old = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(function () { btn.textContent = old; }, 1600);
+    });
+  });
+});
+</script>
+
+</body>
+</html>

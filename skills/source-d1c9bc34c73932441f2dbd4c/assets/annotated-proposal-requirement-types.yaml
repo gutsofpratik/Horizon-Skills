@@ -1,0 +1,21 @@
+requirement_types:
+  instruction: Proposal organization, content, format, submission, volume instructions.
+  evaluation: Factor/subfactor, adjectival/risk standard, award basis, acceptability gate.
+  work: SOW/PWS/SOO task, performance standard, deliverable, management obligation.
+  past-performance: Recency/relevance, references, questionnaires, experience narratives.
+  pricing: Pricing volume/table, basis of estimate, rate, labor category, travel/ODC rules.
+  compliance: Certifications, representations, socioeconomic, security, facility, clearance, contract clauses affecting proposal response.
+  form-attachment: Named forms, templates, resumes, letters, reps/certs, subcontractor docs.
+  inferred: Logical response need derived from evaluation/work requirements but not explicitly instructed.
+  gap: Missing, conflicting, ambiguous, or inaccessible item.
+priorities:
+  mandatory: Must be addressed to be compliant.
+  evaluated: Drives score, acceptability, risk, confidence, strength, weakness, or best value.
+  contractual: Work/deliverable requirement that should shape technical response.
+  informational: Contextual, not necessarily response-driving.
+  inferred: Useful but not expressly required; label clearly.
+statuses:
+  mapped: Requirement has a clear outline location.
+  partial: Requirement is partly mapped or needs more detail.
+  unmapped: No response location yet.
+  gap: Missing input or ambiguity prevents confident mapping.

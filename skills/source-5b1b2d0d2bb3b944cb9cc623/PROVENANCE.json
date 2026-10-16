@@ -1,0 +1,6 @@
+{
+  "repository": "aws/agent-toolkit-for-aws",
+  "ref": "34b3eccfd8b619ea0cb4ba04a9be9dfefebd94e7",
+  "path": "plugins/aws-core/skills/aws-storage/SKILL.md",
+  "source": "https://github.com/aws/agent-toolkit-for-aws.git"
+}

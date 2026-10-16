@@ -1,0 +1,337 @@
+# /// script
+# requires-python = ">=3.9"
+# ///
+"""Assemble the self-contained carta-home Cowork artifact from its source parts.
+
+Inlines the CSS + config + app JS into the template and substitutes the Carta MCP
+connector name, producing ONE self-contained HTML file the Artifact tool publishes
+by path. The model never has to read the large HTML: to change what the
+directory's categories, edit resources/carta-home.config.js; to change its skills, edit
+the plugin's .claude-plugin/skill-directory.json; to change logic, edit
+resources/carta-home.app.js; then re-run this.
+
+Source parts (all in the skill's resources/ dir):
+  carta-home.template.html  — HTML skeleton + <style>/<script> injection markers
+  carta-home.css            — styles          (marker: /* __CARTA_HOME_CSS__ */)
+  carta-home.tracker.js     — Snowplow UI tracker bundle (marker: /* __CARTA_HOME_TRACKER_JS__ */)
+  carta-home.config.js      — DIR_CATEGORIES  (marker: /* __CARTA_HOME_CONFIG_JS__ */)
+  carta-home.app.js         — app logic       (marker: /* __CARTA_HOME_APP_JS__ */)
+
+The artifact's version comes from the plugin's skill-versions registry, keyed by this
+skill (placeholder: {{ARTIFACT_VERSION}}). It lives there rather than beside the skill
+because carta-mcp serves it to the running artifact from the published carta/plugins
+mirror, and a skill that has not opted into publishing never reaches that mirror —
+whereas .claude-plugin/ is plugin-level metadata and is always published.
+
+The `{{CARTA_MCP_SERVER}}` placeholder (throughout the template + app) is replaced with
+the Carta connector's display name — what the artifact runtime's mcp capability
+addresses a connector by. The Skill Directory's skills come from the plugin's .claude-plugin/skill-directory.json
+(placeholder: {{SKILL_DIRECTORY_JSON}}), baked in as the first paint; the page asks
+carta-mcp for the published copy once it is idle. `{{FIRM}}` is left intact — it is a RUNTIME
+placeholder the artifact fills in from list_contexts.
+
+`{{PAGE_TITLE}}` is the one firm-specific thing baked in: it becomes the page's `<title>`,
+and so the published artifact's name, "Carta Home - <firm>". It has to come from the file —
+the Artifact tool reads `<title>` out of the HTML and only falls back to its own `title`
+parameter when the file carries none, so a template with a fixed title publishes every
+firm's page under that one name. The body stays firm-agnostic and still detects whichever
+firm is active when a viewer opens it.
+
+`{{DASHBOARD_URLS}}` (in carta-home.config.js) becomes a JSON object of the dashboard
+artifact URLs published earlier in the same build run, keyed by a DASHBOARDS entry. A key
+passed to --dashboard-building carries the string "building" instead, so home can publish
+before its dashboards exist and redeploy over itself once they do. A key absent from both
+leaves that card on its copyable prompt.
+
+The finished page carries a baseline of itself (see customizations.py), so a later rebuild
+can tell exactly what the user changed on the published copy.
+
+Usage:
+  uv run scripts/build_artifact.py --mcp-server <connector-display-name> \
+      --firm-name "<firm name>" --out <path>/carta-home-<slug>.html \
+      [--dashboard-url soi=https://… --dashboard-building perf]
+"""
+import argparse
+import hashlib
+import json
+import re
+import sys
+from datetime import datetime, timezone
+from html import escape
+from pathlib import Path
+
+# The baseline stamp lives beside this script, which is not on the import path when the
+# build is loaded by file path (as the tests do) rather than run.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from customizations import stamp_baseline  # noqa: E402
+
+SKILL_DIR = Path(__file__).resolve().parent.parent
+RES = SKILL_DIR / "resources"
+# Two ship locations: inside a plugin, and standing alone as a single uploaded skill.
+# Probing both lets the same bundle build either way.
+def _first_existing(*candidates):
+    for path in candidates:
+        if path.exists():
+            return path
+    return candidates[0]
+
+
+VENDOR_DIR = _first_existing(
+    SKILL_DIR.parent.parent / "vendor",  # plugin root / vendor/
+    SKILL_DIR / "vendor",
+)
+
+SKILL_NAME = SKILL_DIR.name
+VERSIONS_FILE = _first_existing(
+    SKILL_DIR.parent.parent / ".claude-plugin" / "skill-versions.json",
+    SKILL_DIR / ".claude-plugin" / "skill-versions.json",
+)
+# The Skill Directory's entries, keyed by skill. Baked in as the page's first paint and
+# fallback; the page asks carta-mcp for the published copy of the same file when idle.
+DIRECTORY_FILE = _first_existing(
+    SKILL_DIR.parent.parent / ".claude-plugin" / "skill-directory.json",
+    SKILL_DIR / ".claude-plugin" / "skill-directory.json",
+)
+SKILLS_ROOT = SKILL_DIR.parent
+# A built artifact can never update itself, so it carries its version with it and
+# compares against the published one at runtime. Strict major.minor.patch: the
+# comparison is semver, and the banner fires on major/minor only.
+SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
+
+# App-layer JS is assembled from multiple source files, concatenated in this
+# order into the single __CARTA_HOME_APP_JS__ slot below. Concatenation order
+# doesn't matter functionally today (function/let declarations, no cross-file
+# execution-order dependencies) — list shared/core logic first by convention.
+# Add new feature files here as carta-home.app.js gets split further.
+APP_JS_PARTS = [
+    "carta-home.app.js",
+    "app/capital-activity.js",
+    "app/version-check.js",
+    "app/live-content.js",
+    "app/skill-directory.js",
+]
+
+MARKERS = {
+    "carta-home.css": r"/\*\s*__CARTA_HOME_CSS__\s*\*/",
+    "carta-home.tracker.js": r"/\*\s*__CARTA_HOME_TRACKER_JS__\s*\*/",
+    "carta-home.config.js": r"/\*\s*__CARTA_HOME_CONFIG_JS__\s*\*/",
+}
+VENDOR_MARKERS = {
+    # chart.js v4.5.1 — replace vendor/chart.umd.min.js and bump this comment to upgrade
+    "chart.umd.min.js": r"/\*\s*__CARTA_HOME_CHART_JS__\s*\*/",
+}
+APP_JS_MARKER = r"/\*\s*__CARTA_HOME_APP_JS__\s*\*/"
+
+# The published artifact's name, and the key SKILL.md Step 2 matches on to find this
+# firm's existing page. One firm per page, so one title per firm.
+TITLE_PREFIX = "Carta Home - "
+
+
+def page_title(firm_name):
+    """The `<title>` text for this firm's page.
+
+    Escapes only the three characters that would end the tag or start an entity —
+    a firm named `Ash & Rowe <Capital>` otherwise produces malformed HTML. Quotes are
+    left alone: this is element text, not an attribute.
+    """
+    return escape(TITLE_PREFIX + firm_name, quote=False)
+
+
+def compute_build_id(template, parts):
+    """Short content hash of all source parts — changes only when a source changes,
+    so a visible `build <id>` makes it obvious whether a panel shows the latest build."""
+    h = hashlib.sha256()
+    h.update(template.encode("utf-8"))
+    for name in sorted(parts):
+        h.update(name.encode("utf-8"))
+        h.update(parts[name].encode("utf-8"))
+    return h.hexdigest()[:8]
+
+
+def read_version():
+    """Return this skill's version from the plugin's skill-versions registry.
+
+    Fails the build rather than defaulting: a wrong version is worse than no build,
+    because it either suppresses a real update banner forever or shows one that can
+    never be satisfied.
+    """
+    label = "{}[{}]".format(VERSIONS_FILE.name, SKILL_NAME)
+    if not VERSIONS_FILE.exists():
+        sys.exit("ERROR: {} is missing".format(VERSIONS_FILE))
+    try:
+        data = json.loads(VERSIONS_FILE.read_text())
+    except ValueError as exc:
+        sys.exit("ERROR: {} is not valid JSON: {}".format(VERSIONS_FILE.name, exc))
+    entry = data.get(SKILL_NAME)
+    if not isinstance(entry, dict):
+        sys.exit('ERROR: {} needs an entry like {{"version": "1.2.3"}}'.format(label))
+    version = entry.get("version")
+    if not isinstance(version, str) or not SEMVER_RE.match(version):
+        sys.exit('ERROR: {} needs a "version" like "1.2.3", got {!r}'.format(label, version))
+    return version
+
+
+def read_skill_directory():
+    """Return the baked Skill Directory: a list of {skill, category, name, order, prompts},
+    plus `tag` and `requires` where an entry sets them.
+
+    Opt-outs (null) are dropped, and so is any skill this install does not carry: the
+    file is plugin-level and always published, but a skill without `publish: true` never
+    reaches a customer's install, and its prompts would route nowhere. Fails the build on
+    a missing or unreadable file, like the version registry.
+    """
+    if not DIRECTORY_FILE.exists():
+        sys.exit("ERROR: {} is missing".format(DIRECTORY_FILE))
+    try:
+        data = json.loads(DIRECTORY_FILE.read_text())
+    except ValueError as exc:
+        sys.exit("ERROR: {} is not valid JSON: {}".format(DIRECTORY_FILE.name, exc))
+    if not isinstance(data, dict):
+        sys.exit("ERROR: {} must be an object keyed by skill".format(DIRECTORY_FILE.name))
+    entries = []
+    for skill, entry in sorted(data.items()):
+        if entry is None or not (SKILLS_ROOT / skill / "SKILL.md").exists():
+            continue
+        baked = {
+            "skill": skill,
+            "category": entry["category"],
+            "name": entry["name"],
+            "order": entry.get("order", 0),
+            "prompts": entry["prompts"],
+        }
+        baked.update({k: entry[k] for k in ("tag", "requires") if k in entry})
+        entries.append(baked)
+    return entries
+
+
+def directory_json(entries):
+    """JSON for inlining into the page's one <script>: `<` is escaped so no prompt can
+    close the script tag early."""
+    return json.dumps(entries, ensure_ascii=False).replace("<", "\\u003c")
+
+
+BUILDING = "building"
+
+
+def parse_dashboard_urls(pairs, building=None):
+    """Turn repeated --dashboard-url key=url into the {{DASHBOARD_URLS}} JSON object.
+
+    A key marked --dashboard-building carries the BUILDING sentinel instead of a URL, so
+    the first publish can say a dashboard is on its way before one exists. A key that is
+    absent from both renders that tile's prompt instead.
+    """
+    urls = {}
+    for pair in pairs or []:
+        key, sep, url = pair.partition("=")
+        if not sep or not key.strip() or not url.strip():
+            sys.exit("ERROR: --dashboard-url expects key=url, got {!r}".format(pair))
+        if not url.startswith(("http://", "https://")):
+            sys.exit("ERROR: --dashboard-url {} must be an http(s) URL, got {!r}".format(key, url))
+        urls[key.strip()] = url.strip()
+    # The marker wins over a URL for the same key: a rebuild replaces the page that URL
+    # points at, so the card says so rather than linking to data on its way out.
+    for key in building or []:
+        key = key.strip()
+        if not key:
+            sys.exit("ERROR: --dashboard-building expects a key")
+        urls[key] = BUILDING
+    return urls
+
+
+def build(mcp_server, firm_name, dashboard_urls=None):
+    template = (RES / "carta-home.template.html").read_text()
+    parts = {name: (RES / name).read_text() for name in MARKERS}
+    parts.update({name: (VENDOR_DIR / name).read_text() for name in VENDOR_MARKERS})
+    parts.update({name: (RES / name).read_text() for name in APP_JS_PARTS})
+    skill_directory = directory_json(read_skill_directory())
+    # The directory is content like any source part, so it moves the build id too.
+    build_id = compute_build_id(template, {**parts, DIRECTORY_FILE.name: skill_directory})
+
+    out = template
+    for filename, marker in {**MARKERS, **VENDOR_MARKERS}.items():
+        content = parts[filename]
+        if not re.search(marker, out):
+            sys.exit("ERROR: marker for {} missing from template".format(filename))
+        # Use a function replacement so backslashes / $-refs in the content are literal.
+        out = re.sub(marker, lambda _m, c=content: c, out, count=1)
+
+    app_js = "\n\n".join(parts[name] for name in APP_JS_PARTS)
+    if not re.search(APP_JS_MARKER, out):
+        sys.exit("ERROR: marker for app JS missing from template")
+    out = re.sub(APP_JS_MARKER, lambda _m, c=app_js: c, out, count=1)
+
+    # Leftover build-time markers would mean an incomplete assembly — fail loudly.
+    for token in ("__CARTA_HOME_CSS__", "__CARTA_HOME_TRACKER_JS__", "__CARTA_HOME_CHART_JS__", "__CARTA_HOME_CONFIG_JS__", "__CARTA_HOME_APP_JS__"):
+        if token in out:
+            sys.exit("ERROR: unresolved marker {} after assembly".format(token))
+
+    out = out.replace("{{CARTA_MCP_SERVER}}", mcp_server)
+    if "{{CARTA_MCP_SERVER}}" in out:
+        sys.exit("ERROR: {{CARTA_MCP_SERVER}} still present after substitution")
+
+    out = out.replace("{{PAGE_TITLE}}", page_title(firm_name))
+    if "{{PAGE_TITLE}}" in out:
+        sys.exit("ERROR: {{PAGE_TITLE}} still present after substitution")
+    out = out.replace("{{DASHBOARD_URLS}}", json.dumps(dashboard_urls or {}, sort_keys=True))
+    if "{{DASHBOARD_URLS}}" in out:
+        sys.exit("ERROR: {{DASHBOARD_URLS}} still present after substitution")
+
+    out = out.replace("{{SKILL_DIRECTORY_JSON}}", skill_directory)
+    if "{{SKILL_DIRECTORY_JSON}}" in out:
+        sys.exit("ERROR: {{SKILL_DIRECTORY_JSON}} still present after substitution")
+
+    out = out.replace("{{BUILD_ID}}", build_id)
+
+    # The update banner stays quiet for a week after this time (see version-check.js).
+    out = out.replace("{{BUILT_AT}}", datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"))
+    if "{{BUILT_AT}}" in out:
+        sys.exit("ERROR: {{BUILT_AT}} still present after substitution")
+
+    version = read_version()
+    out = out.replace("{{ARTIFACT_VERSION}}", version)
+    if "{{ARTIFACT_VERSION}}" in out:
+        sys.exit("ERROR: {{ARTIFACT_VERSION}} still present after substitution")
+
+    # Last, so the baseline records the page exactly as published. A later rebuild compares
+    # the live page against it to find what the user changed (SKILL.md Step 2c).
+    out = stamp_baseline(out, version)
+
+    return out, build_id, version
+
+
+def main():
+    ap = argparse.ArgumentParser(description="Assemble the carta-home artifact.")
+    ap.add_argument("--mcp-server", required=True,
+                    help="Carta connector display name (the {{CARTA_MCP_SERVER}} value)")
+    ap.add_argument("--firm-name", required=True,
+                    help="active firm's name — becomes 'Carta Home - <name>' in the "
+                         "page's <title>, and so the published artifact's name")
+    ap.add_argument("--out", required=True, help="output HTML path")
+    ap.add_argument("--dashboard-url", action="append", metavar="KEY=URL", default=[],
+                    help="published dashboard artifact URL, keyed by a DASHBOARDS entry "
+                         "in carta-home.config.js (repeatable). Omit one to leave that "
+                         "tile on its copyable prompt.")
+    ap.add_argument("--dashboard-building", action="append", metavar="KEY", default=[],
+                    help="mark a DASHBOARDS key as still being built (repeatable). The "
+                         "tile says so and keeps its prompt until a redeploy passes the "
+                         "real --dashboard-url for that key.")
+    args = ap.parse_args()
+
+    firm_name = args.firm_name.strip()
+    if not firm_name:
+        sys.exit("ERROR: --firm-name is empty")
+
+    html, build_id, version = build(args.mcp_server, firm_name, parse_dashboard_urls(args.dashboard_url, args.dashboard_building))
+    out_path = Path(args.out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(html)
+    print(
+        'wrote {} ({} bytes) — v{} build {} — publishes as "{}{}"'.format(
+            out_path, len(html.encode("utf-8")), version, build_id,
+            TITLE_PREFIX, firm_name,
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()

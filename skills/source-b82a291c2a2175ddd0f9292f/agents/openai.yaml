@@ -1,0 +1,4 @@
+interface:
+  display_name: "Security Hardening"
+  short_description: "Evidence-led security reviews and hardening"
+  default_prompt: "Use $security-hardening for this security objective. Select the matching mission profile, load only the relevant references, and return an evidence-backed defensive outcome."

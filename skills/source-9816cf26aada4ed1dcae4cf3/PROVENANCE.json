@@ -1,0 +1,6 @@
+{
+  "repository": "aws/agent-toolkit-for-aws",
+  "ref": "0d6167ad2e6dfb858098c4162fe74d04c975532f",
+  "path": "plugins/aws-agents/skills/agents-pay/packages/openclaw/skills/agents-pay/SKILL.md",
+  "source": "https://github.com/aws/agent-toolkit-for-aws.git"
+}

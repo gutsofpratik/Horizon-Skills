@@ -1,0 +1,623 @@
+---
+name: output-dev-http-client-create
+description: Create shared HTTP clients in src/shared/clients/ for Output SDK workflows. Use when integrating external APIs, creating service wrappers, or standardizing HTTP operations.
+allowed-tools: [Read, Write, Edit, Glob]
+---
+
+# Creating HTTP Clients
+
+## Overview
+
+This skill documents how to create shared HTTP clients for Output SDK workflows. Clients are stored in `src/shared/clients/` and shared across all workflows to ensure consistent error handling, retry logic, and API integration patterns.
+
+## When to Use This Skill
+
+- Integrating a new external API service
+- Creating a reusable HTTP wrapper for a service
+- Standardizing error handling for API calls
+- Moving inline HTTP logic to a shared client
+
+## Location Convention
+
+HTTP clients are stored in the shared clients folder:
+
+```
+src/shared/clients/
+├── gemini_client.ts     # Google Gemini API client
+├── jina_client.ts       # Jina AI client
+├── perplexity_client.ts # Perplexity API client
+└── {service}_client.ts  # Your new client
+```
+
+**Important**: Clients are shared across ALL workflows. Do NOT create per-workflow HTTP clients.
+
+## Other Shared Code Locations
+
+```
+src/shared/
+├── clients/     # API clients (this skill)
+├── utils/       # Utility functions & helpers
+├── services/    # Business logic services
+├── steps/       # Shared step definitions (optional)
+└── evaluators/  # Shared evaluators (optional)
+```
+
+## Import Pattern in Workflows
+
+Use relative imports from workflow files to shared clients:
+
+```typescript
+// CORRECT - Relative path from workflow steps.ts
+import { GeminiImageService } from '../../shared/clients/gemini_client.js';
+import { parseResumeWithJina } from '../../shared/clients/jina_client.js';
+
+// From shared steps (if used)
+import { JinaClient } from '../clients/jina_client.js';
+```
+
+## Critical Import Rules
+
+### HTTP Client Import
+
+```typescript
+// CORRECT - Use @outputai/core/http wrapper
+import { createKyClient } from '@outputai/core/http';
+
+// WRONG - Never use axios directly
+import axios from 'axios';
+```
+
+### Error Types Import
+
+```typescript
+// CORRECT - Import error types from @outputai/core
+import { FatalError, ValidationError } from '@outputai/core';
+
+// WRONG - Custom error classes
+class MyCustomError extends Error { ... }
+```
+
+### Credentials Import
+
+```typescript
+// CORRECT - Use @outputai/core/credentials for secrets
+import { credentials } from '@outputai/core/credentials';
+const apiKey = credentials.require('service.api_key');
+
+// WRONG - Never use process.env for secrets
+const apiKey = process.env.SERVICE_API_KEY;
+```
+
+### Cost Tracking Import
+
+```typescript
+// CORRECT - Attach spend to paid API calls with @outputai/core/http
+import { addRequestCost, createKyClient } from '@outputai/core/http';
+
+// WRONG - Tracking cost yourself in a side table, or skipping it for paid APIs
+```
+
+## Basic Client Structure
+
+### Simple Function-Based Client
+
+```typescript
+import { FatalError, ValidationError } from '@outputai/core';
+import { createKyClient } from '@outputai/core/http';
+import { credentials } from '@outputai/core/credentials';
+
+const API_KEY = credentials.require('service.api_key');
+const BASE_URL = 'https://api.service.com';
+
+const client = createKyClient({
+  prefix: BASE_URL,
+  headers: {
+    Authorization: `Bearer ${API_KEY}`,
+    Accept: 'application/json'
+  },
+  timeout: 30000,
+  retry: {
+    limit: 3,
+    statusCodes: [408, 429, 500, 502, 503, 504]
+  }
+});
+
+/**
+ * Fetch data from the service
+ *
+ * @param query - Search query string
+ * @returns Processed response data
+ * @throws {FatalError} If authentication fails or resource not found
+ * @throws {ValidationError} If temporary error occurs
+ */
+export async function fetchServiceData(query: string): Promise<ServiceResponse> {
+  const response = await client.get('endpoint', {
+    searchParams: { q: query }
+  });
+
+  const data = await response.json();
+
+  if (!data.results) {
+    throw new FatalError('No results returned from service');
+  }
+
+  return data;
+}
+```
+
+### Class-Based Client
+
+```typescript
+import { FatalError, ValidationError } from '@outputai/core';
+import { createKyClient } from '@outputai/core/http';
+import { credentials } from '@outputai/core/credentials';
+
+export interface ServiceOptions {
+  model?: string;
+  timeout?: number;
+}
+
+export class ServiceClient {
+  private readonly client: ReturnType<typeof createKyClient>;
+  private readonly model: string;
+
+  constructor(apiKey?: string) {
+    const key = apiKey ?? credentials.require('service.api_key');
+
+    this.client = createKyClient({
+      prefix: 'https://api.service.com',
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json'
+      },
+      timeout: 30000,
+      retry: {
+        limit: 3,
+        statusCodes: [408, 429, 500, 502, 503, 504]
+      }
+    });
+
+    this.model = 'default-model';
+  }
+
+  async process(input: ProcessInput): Promise<ProcessOutput> {
+    try {
+      const response = await this.client.post('process', {
+        json: {
+          model: this.model,
+          input
+        }
+      });
+
+      return await response.json();
+    } catch (error: unknown) {
+      const err = error as { status?: number; message?: string };
+
+      if (err.status === 429) {
+        throw new ValidationError(`Rate limit exceeded: ${err.message}`);
+      }
+
+      if (err.status === 401 || err.status === 403) {
+        throw new FatalError(`Authentication failed: ${err.message}`);
+      }
+
+      throw new ValidationError(`Service call failed: ${err.message}`);
+    }
+  }
+}
+```
+
+## Real-World Examples
+
+### Example 1: Jina Client (Function-Based)
+
+```typescript
+import { FatalError } from '@outputai/core';
+import { createKyClient } from '@outputai/core/http';
+import { credentials } from '@outputai/core/credentials';
+
+const JINA_API_KEY = credentials.require('jina.api_key');
+const JINA_BASE_URL = 'https://r.jina.ai';
+
+const client = createKyClient({
+  prefix: JINA_BASE_URL,
+  headers: {
+    Authorization: `Bearer ${JINA_API_KEY}`,
+    Accept: 'application/json'
+  },
+  timeout: 30000,
+  retry: {
+    limit: 3,
+    statusCodes: [408, 413, 429, 500, 502, 503, 504]
+  }
+});
+
+/**
+ * Parse PDF resume using Jina Reader API
+ */
+export async function parseResumeWithJina(base64Pdf: string): Promise<string> {
+  const response = await client.post('', {
+    json: { pdf: base64Pdf },
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+
+  const data: {
+    data: {
+      content: string;
+      title?: string;
+    };
+  } = await response.json();
+
+  if (!data.data?.content) {
+    throw new FatalError('No content returned from Jina PDF parser');
+  }
+
+  return data.data.content;
+}
+
+/**
+ * Scrape text content from URL using Jina Reader
+ */
+export async function scrapeTextWithJina(url: string): Promise<string> {
+  const response = await client.get(url, {
+    headers: {
+      'X-Return-Format': 'text',
+      'X-No-Cache': 'true',
+      'X-Timeout': '30'
+    }
+  });
+
+  const data: {
+    data: {
+      text?: string;
+      content?: string;
+    };
+  } = await response.json();
+
+  const textContent = data.data?.text || data.data?.content;
+
+  if (!textContent) {
+    throw new FatalError(`No text content returned from URL: ${url}`);
+  }
+
+  return textContent;
+}
+```
+
+### Example 2: Gemini Client (Class-Based)
+
+```typescript
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { FatalError, ValidationError } from '@outputai/core';
+import { credentials } from '@outputai/core/credentials';
+
+export interface GeminiImageGenerationOptions {
+  prompt: string;
+  referenceImages?: Array<{
+    inlineData: {
+      mimeType: string;
+      data: string;
+    };
+  }>;
+  aspectRatio?: string;
+  resolution?: string;
+  numberOfImages?: number;
+}
+
+export class GeminiImageService {
+  private readonly client: GoogleGenerativeAI;
+  // current as of 2026-05-04 — run output-dev-model-selection for the latest
+  private readonly model: string = 'gemini-3-pro-image';
+
+  constructor(apiKey = credentials.require('google.api_key')) {
+    if (!apiKey) {
+      throw new FatalError(
+        'GeminiImageService: No API Key provided (google.api_key credential).'
+      );
+    }
+    this.client = new GoogleGenerativeAI(apiKey);
+  }
+
+  async generateImage(options: GeminiImageGenerationOptions): Promise<string[]> {
+    const { prompt, referenceImages = [], aspectRatio = '1:1', resolution = '1K', numberOfImages = 1 } = options;
+
+    try {
+      const model = this.client.getGenerativeModel({ model: this.model });
+
+      const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+
+      if (referenceImages.length > 0) {
+        referenceImages.forEach(img => parts.push(img));
+      }
+
+      const finalPrompt = `${prompt}\n\nGenerate this as a ${aspectRatio} aspect ratio image at ${resolution} resolution.`;
+      parts.push({ text: finalPrompt });
+
+      const result = await model.generateContent({
+        contents: [{ role: 'user', parts }],
+        generationConfig: {
+          temperature: 1.0,
+          topP: 0.95,
+          candidateCount: numberOfImages,
+          maxOutputTokens: 8192
+        }
+      });
+
+      const images: string[] = [];
+      const candidates = result.response.candidates || [];
+
+      for (const candidate of candidates) {
+        if (candidate.content?.parts) {
+          for (const part of candidate.content.parts) {
+            if (part.inlineData?.data) {
+              images.push(part.inlineData.data);
+            }
+          }
+        }
+      }
+
+      if (images.length === 0) {
+        throw new ValidationError('No images were generated by Gemini');
+      }
+
+      return images;
+    } catch (error: unknown) {
+      const err = error as { status?: number; message?: string };
+
+      if (err.status === 429) {
+        throw new ValidationError(`Gemini rate limit exceeded: ${err.message}`);
+      }
+
+      if (err.status === 401 || err.status === 403) {
+        throw new FatalError(`Gemini authentication failed: ${err.message}`);
+      }
+
+      throw new ValidationError(`Gemini image generation failed: ${err.message}`);
+    }
+  }
+}
+```
+
+## Error Handling Patterns
+
+### HTTP Status Code Handling
+
+```typescript
+const RETRY_STATUS_CODES = [408, 429, 500, 502, 503, 504];
+const FATAL_STATUS_CODES = [401, 403, 404];
+
+const client = createKyClient({
+  retry: {
+    limit: 3,
+    statusCodes: RETRY_STATUS_CODES
+  },
+  hooks: {
+    beforeError: [
+      ( { error } ) => {
+        const status = error.response?.status;
+        const message = error.message;
+
+        if (status && FATAL_STATUS_CODES.includes(status)) {
+          throw new FatalError(`HTTP ${status} error: ${message}`);
+        }
+
+        throw new ValidationError(`HTTP request failed: ${message}`);
+      }
+    ]
+  }
+});
+```
+
+### Error Type Guidelines
+
+| Status Code | Error Type | Reason |
+|-------------|------------|--------|
+| 401, 403 | FatalError | Auth failures won't succeed on retry |
+| 404 | FatalError | Resource doesn't exist |
+| 408 | ValidationError | Timeout, may succeed on retry |
+| 429 | ValidationError | Rate limit, will succeed after wait |
+| 500+ | ValidationError | Server errors may be temporary |
+
+## Attaching Request Cost (Paid APIs)
+
+If the service a client wraps charges money per request, attach that cost to the request's trace so it shows up in `npx output workflow cost` (see `output-dev-workflow-cost`) and in any `cost:http:request` hook handlers (see `output-dev-cost-hooks`).
+
+Do this **on the client itself**, in an `afterResponse` hook — not at each call site. That way every function or method that goes through the client is costed automatically, and nobody integrating with the client later has to remember to do it.
+
+`addRequestCost(response, totalUsd)` only works on a response that came from `outputFetch` or `createKyClient` — including a `response.clone()` of one, so it's safe to call from inside an `afterResponse` hook (ky passes hooks a clone). If the response didn't originate from `@outputai/core/http`, `addRequestCost` no-ops with a console warning.
+
+There are two common pricing shapes for paid third-party APIs:
+
+### Metered APIs (cost is in the response)
+
+Some APIs report what a specific call cost — in a response header or a JSON field (credits used, units billed, etc). Read that field and pass it straight to `addRequestCost`. Guard against free or cached responses that legitimately report zero cost.
+
+```typescript
+import { addRequestCost, createKyClient } from '@outputai/core/http';
+import { credentials } from '@outputai/core/credentials';
+
+const API_KEY = credentials.require('service.api_key');
+
+const client = createKyClient({
+  prefix: 'https://api.service.com',
+  headers: { Authorization: `Bearer ${API_KEY}` },
+  timeout: 30000,
+  retry: { limit: 3, statusCodes: [408, 429, 500, 502, 503, 504] },
+  hooks: {
+    afterResponse: [
+      async (_request, _options, response) => {
+        // Errored responses (4xx/5xx) and retried attempts aren't billed the
+        // same as a successful call — skip them rather than over-counting.
+        if (!response.ok) {
+          return;
+        }
+
+        try {
+          const body = await response.clone().json() as { creditsUsed?: number; cached?: boolean };
+
+          // Skip cached or free responses that legitimately cost nothing.
+          if (body.cached || !body.creditsUsed) {
+            return;
+          }
+
+          const usdPerCredit = 0.01;
+          addRequestCost(response, body.creditsUsed * usdPerCredit);
+        } catch {
+          // Never let cost tracking break the request.
+        }
+      }
+    ]
+  }
+});
+```
+
+### Flat-rate / subscription APIs (assign a notional cost)
+
+When a service is billed as a flat monthly fee or subscription tier, there's no true marginal cost per call — but recording *some* per-call figure keeps spend comparable across services in `workflow cost` and any cost dashboards. Assign a notional per-call USD rate as a constant, overridable by a non-secret environment variable so it can be tuned without a code change.
+
+```typescript
+import { addRequestCost, createKyClient } from '@outputai/core/http';
+import { credentials } from '@outputai/core/credentials';
+
+const API_KEY = credentials.require('service.api_key');
+
+// Notional per-call cost for a flat-rate subscription. Not a secret, so a
+// plain env var is fine here — unlike API keys, which must go through
+// @outputai/core/credentials.
+const NOTIONAL_COST_USD = Number(process.env.SERVICE_NOTIONAL_COST_USD ?? 0.005);
+
+const client = createKyClient({
+  prefix: 'https://api.service.com',
+  headers: { Authorization: `Bearer ${API_KEY}` },
+  timeout: 30000,
+  retry: { limit: 3, statusCodes: [408, 429, 500, 502, 503, 504] },
+  hooks: {
+    afterResponse: [
+      (_request, _options, response) => {
+        // Errored responses (4xx/5xx) and retried attempts aren't billed the
+        // same as a successful call — skip them rather than over-counting.
+        if (!response.ok) {
+          return;
+        }
+
+        addRequestCost(response, NOTIONAL_COST_USD);
+      }
+    ]
+  }
+});
+```
+
+The constant above is a placeholder — `config/costs.yml` (see `output-dev-workflow-cost`) can override the actual dollar figure per service afterward, without another code change. Add a `services.<name>` entry with `type: request`, a matching `url_pattern`, and an `endpoints.<name>` block giving `pattern` + `price` for the call. (`default_price` only applies inside a `models`/`model_path` entry, for picking a fallback price when the request's model isn't in `models` — it does nothing paired with a bare `url_pattern`.) Prefer that file over inventing more env vars once you have more than one or two notional rates to tune.
+
+**Rules:**
+
+- Never `throw` from an `afterResponse` cost hook — a throw there fails the request itself. Wrap body parsing in `try/catch` and silently skip on parse failure.
+- The hook fires once per attempt, including retries — skip `!response.ok` attempts unless you know the API bills failed requests too (the framework itself does count a recorded cost event "regardless of HTTP status" once one exists — the event is proof of a charge). When in doubt, check the provider's billing docs before adding the guard.
+- Only do this for paid third-party APIs. Free or internal services don't need it.
+- Skip this pattern for LLM providers — those costs are computed automatically from token usage via `llm:generation:metering`. `addRequestCost` is for non-LLM HTTP calls only.
+- To consume these costs elsewhere (forward to your own observability system, log them, alert on them), see `output-dev-cost-hooks`.
+
+## Best Practices
+
+### 1. Use Credentials for API Keys
+
+Prefer `@outputai/core/credentials` over `process.env` for secrets management. See `output-dev-credentials` skill for details.
+
+```typescript
+import { credentials } from '@outputai/core/credentials';
+
+// credentials.require() throws MissingCredentialError if not found
+const apiKey = credentials.require('service.api_key');
+
+// credentials.get() returns undefined or default if not found
+const region = credentials.get('aws.region', 'us-east-1');
+```
+
+### 2. Document Functions with JSDoc
+
+```typescript
+/**
+ * Fetch user profile from external service
+ *
+ * @param userId - Unique user identifier
+ * @returns User profile data
+ * @throws {FatalError} If user not found or auth fails
+ * @throws {ValidationError} If temporary error occurs
+ *
+ * @example
+ * const profile = await fetchUserProfile('user-123');
+ */
+export async function fetchUserProfile(userId: string): Promise<UserProfile> {
+  // ...
+}
+```
+
+### 3. Use Consistent Timeouts
+
+```typescript
+// Standard timeout: 30 seconds
+timeout: 30000
+
+// Long-running operations: 60 seconds
+timeout: 60000
+```
+
+### 4. Consume or Cancel Response Bodies
+
+`createKyClient` follows Fetch response-body semantics: callers own returned response bodies. Prefer body readers like `.json()` or `.text()`
+when the payload is needed. If a request only reads metadata such as `response.url`, `response.status`, or headers, cancel the
+unused body in a `finally` block.
+
+```typescript
+const response = await client.get( url );
+
+try {
+  return response.url;
+} finally {
+  await response.body?.cancel();
+}
+```
+
+`HEAD` requests do not have response bodies, so this is only needed for methods that can return one.
+
+### 5. Export TypeScript Interfaces
+
+```typescript
+// Export interfaces for consumers
+export interface ServiceResponse {
+  data: {
+    id: string;
+    content: string;
+  };
+  metadata: {
+    processedAt: string;
+  };
+}
+```
+
+## Verification Checklist
+
+- [ ] Client file located in `src/shared/clients/` directory
+- [ ] File named `{service}_client.ts`
+- [ ] `createKyClient` imported from `@outputai/core/http` (not axios)
+- [ ] `FatalError` and `ValidationError` imported from `@outputai/core`
+- [ ] API key validation in constructor/initialization
+- [ ] Retry configuration for appropriate status codes
+- [ ] FatalError used for 401, 403, 404 responses
+- [ ] ValidationError used for 429, 5xx responses
+- [ ] Non-HEAD responses are consumed or cancelled when only metadata is used
+- [ ] JSDoc documentation for exported functions
+- [ ] TypeScript interfaces exported for response types
+- [ ] Paid third-party API calls attach cost via `addRequestCost` in an `afterResponse` hook
+
+## Related Skills
+
+- `output-dev-step-function` - Using clients in step functions
+- `output-dev-evaluator-function` - Using clients in evaluators
+- `output-dev-folder-structure` - Understanding project layout
+- `output-dev-credentials` - Encrypted secrets management
+- `output-dev-cost-hooks` - Subscribing to cost events (`cost:http:request`, `llm:generation:metering`) for observability
+- `output-error-http-client` - Troubleshooting HTTP issues
+- `output-error-try-catch` - Proper error handling patterns

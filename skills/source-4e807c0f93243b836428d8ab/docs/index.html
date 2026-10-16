@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>入戏.skill — 把一本书变成可玩的视觉小说 | Book to Visual Novel (Galgame) AI Skill</title>
+<meta name="description" content="入戏.skill：给它一本书（EPUB/TXT），产出双击即玩的视觉小说（galgame）。你扮演原著里被略过的边角人物，每个分支都指得回原文，通关结算你读懂了多少。Turn any book into a playable visual novel — every branch traces back to a sentence in the original. Free, open-source Claude skill.">
+<meta name="keywords" content="visual novel generator, book to game, galgame, 视觉小说, 书改游戏, interactive fiction, Claude skill, AI agent, 卡夫卡, 变形记, 傲慢与偏见, Kafka, Pride and Prejudice, novel adaptation, renpy alternative">
+<link rel="canonical" href="https://swaylq.github.io/ruxi-skill/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="入戏.skill — 把一本书变成你能玩进去的一场戏">
+<meta property="og:description" content="一本书 → 一个双击即玩的视觉小说。你演原著里被略过的人，每个选择都指得回原文。在线试玩《变形记》《傲慢与偏见》。">
+<meta property="og:url" content="https://swaylq.github.io/ruxi-skill/">
+<meta property="og:image" content="https://swaylq.github.io/ruxi-skill/og.jpg">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ruxi.skill — Turn any book into a playable visual novel">
+<meta name="twitter:description" content="You play a character the original barely mentions. Every branch traces back to a sentence in the text. Play Kafka & Austen demos in your browser.">
+<meta name="twitter:image" content="https://swaylq.github.io/ruxi-skill/og.jpg">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@graph":[
+ {"@type":"SoftwareApplication","name":"入戏.skill (ruxi-skill)","applicationCategory":"GameApplication","operatingSystem":"Any (browser)","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"},"description":"Turn any book into a playable visual novel. Open-source AI agent skill: the player is a side character the original overlooks; every branch point cites its source sentence; endings include the canon one.","url":"https://swaylq.github.io/ruxi-skill/","sameAs":"https://github.com/swaylq/ruxi-skill","license":"https://opensource.org/licenses/MIT"},
+ {"@type":"VideoGame","name":"变形记 · 厨房这一侧","inLanguage":"zh","genre":"Visual Novel","gamePlatform":"Web browser","url":"https://swaylq.github.io/ruxi-skill/metamorphosis/","isBasedOn":{"@type":"Book","name":"Die Verwandlung","author":{"@type":"Person","name":"Franz Kafka"},"datePublished":"1915"}},
+ {"@type":"VideoGame","name":"傲慢与偏见 · 下房这一侧","inLanguage":"zh","genre":"Visual Novel","gamePlatform":"Web browser","url":"https://swaylq.github.io/ruxi-skill/pride/","isBasedOn":{"@type":"Book","name":"Pride and Prejudice","author":{"@type":"Person","name":"Jane Austen"},"datePublished":"1813"}}
+]}
+</script>
+<style>
+  :root{--bg:#14110d;--panel:#1e1913;--text:#d9cfbf;--dim:#8a7e6c;--accent:#b98a4e;
+    --serif:"Songti SC","STSong","Noto Serif CJK SC","Source Han Serif SC",Georgia,serif}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--text);font-family:var(--serif);line-height:1.9;
+    background-image:radial-gradient(100% 50% at 50% 0%,#1e1812 0%,var(--bg) 65%)}
+  a{color:var(--accent);text-decoration:none}
+  .wrap{max-width:880px;margin:0 auto;padding:0 22px}
+  header{text-align:center;padding:84px 0 56px}
+  .fleuron{color:var(--accent);font-size:22px;letter-spacing:.6em;text-indent:.6em}
+  h1{font-size:44px;letter-spacing:.3em;font-weight:600;margin:18px 0 10px}
+  .tag{font-size:17px;color:var(--dim);letter-spacing:.1em}
+  .cta{margin-top:36px;display:flex;gap:18px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-block;border:1px solid var(--accent);padding:13px 34px;font-size:15px;
+    letter-spacing:.35em;text-indent:.35em;color:var(--text);transition:all .25s}
+  .btn:hover{background:rgba(185,138,78,.12)}
+  .btn.primary{background:var(--accent);color:#17130f;font-weight:600}
+  .btn.primary:hover{background:#caa063}
+  section{padding:44px 0}
+  h2{font-size:15px;color:var(--dim);letter-spacing:.5em;font-weight:400;text-align:center;margin-bottom:34px}
+  .books{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px}
+  .book{border:1px solid rgba(185,138,78,.3);background:var(--panel);padding:0;overflow:hidden;transition:border-color .25s,transform .25s;display:block;color:var(--text)}
+  .book:hover{border-color:var(--accent);transform:translateY(-3px)}
+  .book img{width:100%;aspect-ratio:390/300;object-fit:cover;object-position:top;display:block;filter:saturate(.9)}
+  .book .pad{padding:20px 22px 22px}
+  .book .bt{font-size:20px;letter-spacing:.08em}
+  .book .ba{color:var(--dim);font-size:13px;margin:2px 0 12px}
+  .book .role{color:var(--accent);font-size:14px;border-top:1px solid rgba(185,138,78,.2);padding-top:12px;line-height:1.9}
+  .book .q{color:var(--dim);font-size:13.5px;font-style:italic;margin-top:6px}
+  .book .play{margin-top:14px;font-size:13px;letter-spacing:.3em;color:var(--accent)}
+  table{width:100%;border-collapse:collapse;font-size:15px}
+  td,th{border:1px solid rgba(185,138,78,.22);padding:12px 16px;text-align:left;vertical-align:top}
+  th{color:var(--accent);font-weight:400;letter-spacing:.1em;white-space:nowrap}
+  td.no{color:var(--accent);white-space:nowrap}
+  .how{background:var(--panel);border:1px solid rgba(185,138,78,.2);padding:26px 30px;font-size:15px}
+  .how b{color:var(--accent);font-weight:400}
+  .note{color:var(--dim);font-size:14px;text-align:center;max-width:640px;margin:0 auto;line-height:2}
+  footer{text-align:center;padding:48px 0 60px;color:var(--dim);font-size:13px;letter-spacing:.08em;line-height:2.2;border-top:1px solid rgba(185,138,78,.15);margin-top:30px}
+  @media(max-width:560px){h1{font-size:34px}header{padding:56px 0 40px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="fleuron">❦</div>
+    <h1>入 戏</h1>
+    <p class="tag">把一本书，变成你能玩进去的一场戏。<br>Turn any book into a visual novel you can step into.</p>
+    <div class="cta">
+      <a class="btn primary" href="metamorphosis/">立即试玩</a>
+      <a class="btn" href="https://github.com/swaylq/ruxi-skill">GitHub ★</a>
+    </div>
+  </header>
+
+  <section id="play">
+    <h2>在 线 试 玩</h2>
+    <div class="books">
+      <a class="book" href="metamorphosis/">
+        <img src="shots/02-dialogue.png" alt="变形记视觉小说游戏截图：葛蕾特在雨天走廊" loading="lazy">
+        <div class="pad">
+          <div class="bt">变形记 · 厨房这一侧</div>
+          <div class="ba">Franz Kafka · 1915 · 约 20 分钟一周目</div>
+          <div class="role">你是萨姆沙家十六岁的帮厨女孩——原著只给了她一句「勇敢地留了下来」。</div>
+          <div class="q">如果你不锁那扇门呢？</div>
+          <div class="play">开 始 阅 读 ▸</div>
+        </div>
+      </a>
+      <a class="book" href="pride/">
+        <img src="shots/pride-dialogue.png" alt="傲慢与偏见视觉小说游戏截图：仆人厅" loading="lazy">
+        <div class="pad">
+          <div class="bt">傲慢与偏见 · 下房这一侧</div>
+          <div class="ba">Jane Austen · 1813 · 约 25 分钟一周目</div>
+          <div class="role">你是朗博恩的管家希尔太太——私奔的专差消息，原文里是你先知道的。</div>
+          <div class="q">这个家的体面，有一半锁在仆人房里。</div>
+          <div class="play">开 始 阅 读 ▸</div>
+        </div>
+      </a>
+    </div>
+    <p class="note" style="margin-top:22px">离线可玩的单文件 HTML · 手机与桌面皆可 · 无任何外部请求与追踪</p>
+  </section>
+
+  <section>
+    <h2>五 条 铁 律</h2>
+    <table>
+      <tr><td class="no">一</td><td>不覆盖全书，只取五到八场戏——视觉小说的时间单位是一场戏，不是一章</td></tr>
+      <tr><td class="no">二</td><td>玩家默认演<b style="color:var(--accent)">原著里被略过的边角人物</b>：主线照常发生，你在缝隙里选择</td></tr>
+      <tr><td class="no">三</td><td>每个分支点必须<b style="color:var(--accent)">指得回原文的一句话</b>，游戏内标注出处——玩，是一种重读</td></tr>
+      <tr><td class="no">四</td><td>不做好感度，做<b style="color:var(--accent)">理解度</b>：选项是解读不是讨好；通关结算你读懂了多少</td></tr>
+      <tr><td class="no">五</td><td>结局里必有一条是<b style="color:var(--accent)">原著真实发生的事</b>，标为正典</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <h2>它 怎 么 工 作</h2>
+    <div class="how">
+      <p><b>〇 版权判定</b> —— 作者卒年＋首发年，三档结论写进产物；有版权的书只做本地版</p>
+      <p><b>一 拆书选戏</b> —— 「压强 = 对白占比 × 交锋次数 ÷ 在场人数」，机械算出全书最锋利的几场戏，零 token</p>
+      <p><b>二 定角</b> —— 从原文 grep 出没人写的仆人、信使、邻居，验三条标准</p>
+      <p><b>三 写本</b> —— 剧本是一个 JSON，每个选择肢带原文出处，找不到出处的选项删除</p>
+      <p><b>四 构建自测</b> —— 校验构建单文件 HTML；穷举全部路径验证每个结局可达、每档判词有人能落进</p>
+    </div>
+    <p class="note" style="margin-top:20px">开源 MIT · 一个 <a href="https://github.com/swaylq/ruxi-skill">Claude / AI agent skill</a>，装上后对 agent 说「把《某本书》做成游戏」即可</p>
+  </section>
+
+  <footer>
+    入戏.skill · MIT License · <a href="https://github.com/swaylq/ruxi-skill">GitHub</a> · <a href="https://github.com/swaylq/ruxi-skill#readme">文档</a><br>
+    姊妹项目：<a href="https://master-skill.org">大师.skill</a>（蒸馏一整个行业）· 本站两个 demo 均改编自公有领域原著<br>
+    <span style="font-style:italic">一本好书值得读两遍。第二遍，从里面读。</span>
+  </footer>
+</div>
+</body>
+</html>

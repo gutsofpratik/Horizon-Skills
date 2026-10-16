@@ -1,0 +1,6 @@
+{
+  "repository": "anthropics/claude-plugins-official",
+  "ref": "main",
+  "path": "plugins/claude-code-setup/skills/claude-automation-recommender/SKILL.md",
+  "source": "https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-code-setup"
+}

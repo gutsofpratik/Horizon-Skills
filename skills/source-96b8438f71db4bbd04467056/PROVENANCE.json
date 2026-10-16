@@ -1,0 +1,6 @@
+{
+  "repository": "antonbabenko/terraform-skill",
+  "ref": "default",
+  "path": "skills/terraform-skill/SKILL.md",
+  "source": "https://github.com/antonbabenko/terraform-skill"
+}

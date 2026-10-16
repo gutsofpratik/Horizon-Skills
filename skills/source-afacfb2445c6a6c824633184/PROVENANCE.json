@@ -1,0 +1,6 @@
+{
+  "repository": "getsentry/plugin-claude",
+  "ref": "73e53541d7af21672e27428c7067f4264b8a3d65",
+  "path": "skills/sentry-create-alert/SKILL.md",
+  "source": "https://github.com/getsentry/plugin-claude.git"
+}

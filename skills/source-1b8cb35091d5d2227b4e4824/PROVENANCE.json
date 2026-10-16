@@ -1,0 +1,6 @@
+{
+  "repository": "callstackincubator/agent-skills",
+  "ref": "default",
+  "path": "plugins/vendored/.agents/skills/agent-device/SKILL.md",
+  "source": "https://github.com/callstackincubator/agent-skills"
+}

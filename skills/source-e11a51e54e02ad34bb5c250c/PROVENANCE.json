@@ -1,0 +1,6 @@
+{
+  "repository": "supabase/agent-skills",
+  "ref": "default",
+  "path": "skills/supabase-postgres-best-practices/SKILL.md",
+  "source": "https://github.com/supabase/agent-skills"
+}

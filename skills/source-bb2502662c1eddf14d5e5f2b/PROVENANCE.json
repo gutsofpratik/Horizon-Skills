@@ -1,0 +1,6 @@
+{
+  "repository": "vercel-labs/skills",
+  "ref": "main",
+  "path": "skills/find-skills/SKILL.md",
+  "source": "https://github.com/vercel-labs/skills/tree/main/skills/find-skills"
+}

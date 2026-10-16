@@ -1,0 +1,308 @@
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+"""
+render-artifact.py — render the firm-level SOI Live Artifact with the firm's
+full fund list embedded for the dropdown.
+
+Every invocation rebuilds the artifact from scratch. The skill enumerates the
+firm's funds via fa:list:entities, writes them to a JSON file, and calls this
+script with the file path. There is no prior-state recovery, no merge, and no
+state persisted outside the rendered HTML.
+
+Doing the substitution in a script (rather than asking the LLM to Read → modify
+→ Write the ~30KB template) keeps byte-level work off the model token path,
+cutting tokens and latency.
+
+Usage:
+    uv run render-artifact.py <output> <artifact_id> \\
+        <mcp_server> <firm_uuid> <firm_name> <funds_file> <initial_fund_uuid> \\
+        [--home-url <carta_home_url>]
+
+--home-url is the Carta Home artifact that built this page; it becomes the
+"Back to Home" link. Without it the link stays hidden.
+
+The template is resolved relative to this file, so callers only locate the script.
+
+<funds_file> is a path to a JSON file whose contents are a non-empty list of
+{"uuid": "...", "name": "...", "currency": "...", "fund_family_name": "...",
+"vintage_date": "YYYY-MM-DD"} dicts. uuid, name, and currency are required on
+every entry; fund_family_name and vintage_date are both optional (omit, or set
+to null, when not applicable/known). fund_family_name groups the fund dropdown
+by family, adding an "All of <family>" rollup option per family with more than
+one fund. vintage_date sorts the dropdown most-recent-vintage-first; funds
+missing it sort last. It is a path
+(not a positional JSON string) because
+legitimate fund names contain apostrophes ("O'Reilly Capital",
+"St. James's Place Holdings"), JSON does not escape ', and shell single-quoting
+needed to preserve JSON's embedded double quotes terminates on the first '.
+The tempfile bridge eliminates that hazard.
+
+Embedded state block (in the rendered HTML, consumed at runtime by artifact.html):
+    <script type="application/json" id="soi-funds-state">
+    {"firm_uuid": "...", "firm_name": "...", "funds": [{"uuid": "...", "name": "...",
+    "currency": "...", "vintage_date": "..."}]}
+    </script>
+
+On success, one line is printed to stdout: the absolute output path. The calling
+skill publishes it with the Artifact tool, passing the existing artifact's `url`
+when one is already published so the page redeploys in place.
+
+Output path and funds-file path are constrained to live under CWD. SKILL.md
+says the same thing in prose, but a prompt-injected LLM could pass an
+arbitrary path; the bounds check is the actual enforcement.
+"""
+
+import html
+import json
+import re
+import sys
+from pathlib import Path
+
+_LIB = next(p for p in Path(__file__).resolve().parents if (p / "lib" / "live_artifact_render").is_dir()) / "lib"
+sys.path.insert(0, str(_LIB))
+
+from live_artifact_render import (  # noqa: E402
+    ARTIFACT_ID_RE,
+    CLAUDE_ARTIFACT_URL_RE,
+    MCP_SERVER_RE,
+    UUID_RE,
+    check_path_under_cwd,
+    js_safe_json,
+)
+
+# Two ship locations with different template offsets; probing both keeps the
+# carta-soi and carta-portfolio-analytics-routing copies byte-identical.
+TEMPLATE_CANDIDATES = (
+    Path(__file__).resolve().parent.parent / "references" / "artifact.html",
+    Path(__file__).resolve().parent.parent / "artifact.html",
+)
+
+# The two ship locations sit at different depths under the plugin, so walk up to the
+# .claude-plugin directory rather than counting parents.
+def _plugin_root():
+    for parent in Path(__file__).resolve().parents:
+        if (parent / ".claude-plugin" / "skill-versions.json").exists():
+            return parent
+    return None
+
+
+ARTIFACT_SKILL = "carta-soi"
+
+
+def read_version():
+    """This artifact's version, for the update banner it renders at runtime.
+
+    A missing registry is not fatal: the banner simply never fires, which is better
+    than refusing to render a Schedule of Investments over it.
+    """
+    root = _plugin_root()
+    if root is None:
+        return ""
+    try:
+        data = json.loads((root / ".claude-plugin" / "skill-versions.json").read_text())
+    except (ValueError, OSError):
+        return ""
+    entry = data.get(ARTIFACT_SKILL)
+    version = entry.get("version") if isinstance(entry, dict) else None
+    return version if isinstance(version, str) else ""
+
+
+PLACEHOLDERS = (
+    "{{ARTIFACT_VERSION}}",
+    "{{FUNDS_JSON}}",
+    "{{INITIAL_FUND_UUID}}",
+    "{{CARTA_MCP_SERVER}}",
+    "{{FIRM_NAME}}",
+    "{{FIRM_UUID}}",
+    "{{HOME_URL}}",
+)
+
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+# Must match the artifact's own ALL_ENTITIES_VALUE.
+ALL_ENTITIES_VALUE = "__all_entities__"
+
+
+def load_funds(funds_file: Path) -> "list | None":
+    """Read and validate the funds list. Return the list, or None on error
+    (after printing a message to stderr). On success the returned list contains
+    {uuid, name, currency} dicts.
+    """
+    if not funds_file.is_file():
+        print(f"error: funds_file not found or not a regular file: {funds_file}", file=sys.stderr)
+        return None
+    try:
+        data = json.loads(funds_file.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        print(f"error: funds_file is not valid JSON: {e}", file=sys.stderr)
+        return None
+    if not isinstance(data, list):
+        print(f"error: funds_file must contain a JSON array, got {type(data).__name__}", file=sys.stderr)
+        return None
+    if len(data) == 0:
+        print("error: funds list must be non-empty", file=sys.stderr)
+        return None
+    for i, entry in enumerate(data):
+        if not isinstance(entry, dict):
+            print(f"error: fund entry #{i} is not an object: {entry!r}", file=sys.stderr)
+            return None
+        allowed_keys = {"uuid", "name", "currency", "fund_family_name", "vintage_date"}
+        required_keys = {"uuid", "name", "currency"}
+        extra = entry.keys() - allowed_keys
+        missing = required_keys - entry.keys()
+        if extra or missing:
+            print(
+                f"error: fund entry #{i} must have 'uuid', 'name', 'currency', and optionally "
+                f"'fund_family_name'/'vintage_date', got {sorted(entry.keys())}",
+                file=sys.stderr,
+            )
+            return None
+        # fund_family_name is optional (funds outside any family omit it or set it to
+        # null); when present it must be a non-empty string used for dropdown grouping.
+        if "fund_family_name" in entry and entry["fund_family_name"] is not None:
+            if not isinstance(entry["fund_family_name"], str) or entry["fund_family_name"] == "":
+                print(
+                    f"error: fund entry #{i} has invalid fund_family_name: {entry['fund_family_name']!r}",
+                    file=sys.stderr,
+                )
+                return None
+        # vintage_date is optional (omit or null when unknown) — used only to sort the
+        # fund dropdown most-recent-first. Undated funds sort last, not rejected.
+        if "vintage_date" in entry and entry["vintage_date"] is not None:
+            if not isinstance(entry["vintage_date"], str) or not DATE_RE.match(entry["vintage_date"]):
+                print(
+                    f"error: fund entry #{i} has invalid vintage_date (want YYYY-MM-DD or null): "
+                    f"{entry['vintage_date']!r}",
+                    file=sys.stderr,
+                )
+                return None
+        if not isinstance(entry["uuid"], str) or not UUID_RE.match(entry["uuid"]):
+            print(f"error: fund entry #{i} has invalid uuid: {entry['uuid']!r}", file=sys.stderr)
+            return None
+        if not isinstance(entry["name"], str) or entry["name"] == "":
+            print(f"error: fund entry #{i} has invalid name: {entry['name']!r}", file=sys.stderr)
+            return None
+        # An amount rendered without its currency is misleading, so a blank or
+        # non-string code is rejected rather than displayed empty.
+        if not isinstance(entry["currency"], str) or entry["currency"] == "":
+            print(f"error: fund entry #{i} has invalid currency: {entry['currency']!r}", file=sys.stderr)
+            return None
+    return data
+
+
+def main() -> int:
+    args = sys.argv[1:]
+    home_url = ""
+    if len(args) == 9 and args[7] == "--home-url":
+        home_url = args.pop()
+        args.pop()
+    if len(args) != 7:
+        print(
+            "usage: render-artifact.py <output> <artifact_id> "
+            "<mcp_server> <firm_uuid> <firm_name> <funds_file> <initial_fund_uuid> "
+            "[--home-url <carta_home_url>]",
+            file=sys.stderr,
+        )
+        return 2
+
+    (output, artifact_id, mcp_server,
+     firm_uuid, firm_name, funds_file, initial_fund_uuid) = args
+
+    if home_url and not CLAUDE_ARTIFACT_URL_RE.match(home_url):
+        print(f"error: --home-url is not a claude.ai artifact URL: {home_url!r}", file=sys.stderr)
+        return 1
+
+    if not UUID_RE.match(firm_uuid):
+        print(f"error: firm_uuid is not a valid UUID: {firm_uuid!r}", file=sys.stderr)
+        return 1
+    # The artifact's own sentinel for its pooled firm-wide scope, so a firm can
+    # open on every fund at once instead of an arbitrary single one.
+    if initial_fund_uuid != ALL_ENTITIES_VALUE and not UUID_RE.match(initial_fund_uuid):
+        print(
+            f"error: initial_fund_uuid must be a fund UUID or {ALL_ENTITIES_VALUE!r}; "
+            f"got: {initial_fund_uuid!r}",
+            file=sys.stderr,
+        )
+        return 1
+    if not MCP_SERVER_RE.match(mcp_server):
+        print(
+            f"error: mcp_server must be the Carta connector's display name — non-empty "
+            f"and free of quotes, angle brackets and newlines; got: {mcp_server!r}",
+            file=sys.stderr,
+        )
+        return 1
+    if not ARTIFACT_ID_RE.match(artifact_id):
+        print(f"error: artifact_id is not a valid kebab-case slug: {artifact_id!r}", file=sys.stderr)
+        return 1
+
+    out_path = check_path_under_cwd(Path(output), "output path")
+    if out_path is None:
+        return 1
+
+    funds_path = check_path_under_cwd(Path(funds_file), "funds_file path")
+    if funds_path is None:
+        return 1
+
+    funds = load_funds(funds_path)
+    if funds is None:
+        return 1
+
+    if initial_fund_uuid == ALL_ENTITIES_VALUE:
+        # The artifact only offers the pooled option when there is more than one
+        # fund to pool, so a single-fund firm has to open on that fund.
+        if len(funds) < 2:
+            print(
+                f"error: initial_fund_uuid {ALL_ENTITIES_VALUE!r} needs at least two funds; "
+                f"funds_file has {len(funds)}",
+                file=sys.stderr,
+            )
+            return 1
+    elif not any(f["uuid"] == initial_fund_uuid for f in funds):
+        print(
+            f"error: initial_fund_uuid {initial_fund_uuid} is not present in funds_file",
+            file=sys.stderr,
+        )
+        return 1
+
+    src = next((c for c in TEMPLATE_CANDIDATES if c.is_file()), None)
+    if src is None:
+        print(
+            "error: template artifact.html not found at any of: "
+            + ", ".join(str(c) for c in TEMPLATE_CANDIDATES),
+            file=sys.stderr,
+        )
+        return 1
+
+    content = src.read_text(encoding="utf-8")
+    missing = [p for p in PLACEHOLDERS if p not in content]
+    if missing:
+        print(
+            f"error: template missing required placeholders: {missing}",
+            file=sys.stderr,
+        )
+        return 1
+
+    state_obj = {
+        "firm_uuid": firm_uuid,
+        "firm_name": firm_name,
+        "funds": funds,
+    }
+
+    # First, so a firm or fund name that spells a placeholder is never substituted.
+    content = content.replace("{{HOME_URL}}", home_url)
+    content = content.replace("{{FUNDS_JSON}}", js_safe_json(state_obj))
+    content = content.replace("{{INITIAL_FUND_UUID}}", initial_fund_uuid)
+    content = content.replace("{{CARTA_MCP_SERVER}}", mcp_server)
+    content = content.replace("{{FIRM_NAME}}", html.escape(firm_name))
+    content = content.replace("{{FIRM_UUID}}", firm_uuid)
+    content = content.replace("{{ARTIFACT_VERSION}}", read_version())
+
+    out_path.write_text(content, encoding="utf-8")
+    print(out_path)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

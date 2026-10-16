@@ -1,0 +1,6 @@
+{
+  "repository": "anthropics/claude-plugins-official",
+  "ref": "main",
+  "path": "plugins/mcp-server-dev/skills/build-mcpb/SKILL.md",
+  "source": "https://github.com/anthropics/claude-plugins-official/tree/main/plugins/mcp-server-dev"
+}

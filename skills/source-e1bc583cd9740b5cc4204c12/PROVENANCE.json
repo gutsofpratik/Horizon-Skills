@@ -1,0 +1,6 @@
+{
+  "repository": "awslabs/agent-plugins",
+  "ref": "fbefb3764e67558fe10ac834dd85db49734aa9b6",
+  "path": "plugins/deploy-on-aws/skills/elastic-beanstalk/SKILL.md",
+  "source": "https://github.com/awslabs/agent-plugins.git"
+}

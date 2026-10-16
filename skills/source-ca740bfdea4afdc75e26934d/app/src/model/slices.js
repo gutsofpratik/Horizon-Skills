@@ -1,0 +1,254 @@
+// Slice helpers — a slice is a self-contained scenario workspace
+// (assumptions + company registry). The baseline slice mirrors Carta at
+// workbook defaults and stays locked; experiments live in copies.
+
+export const BASELINE_ID = "baseline";
+
+// The company-level fields a user can edit in a scenario. MUST match
+// SCENARIO_EDIT_FIELDS in scripts/build_datadir.py — a field missing here is
+// silently dropped from a saved delta. Everything else on a company is the
+// immutable Carta layer.
+export const EDIT_FIELDS = ["valuationB", "markMultiple", "futureDilution",
+  "includeInNav", "exited", "exitTimingQ", "waterfallMode", "archived", "notes",
+  "secondaries"];
+
+/** Reset every editable input in a slice body to its default. */
+export function normalizeToDefaults(body) {
+  const doc = structuredClone(body);
+  doc.assumptions = { ...doc.assumptions, carryRate: 0.2, carryRates: {}, spRate: 0.102, feeLoads: {}, followOnRatios: {}, recyclingRatios: {} };
+  for (const c of doc.companies) {
+    c.valuationB = c.defaultValuationB ?? null;
+    c.markMultiple = 1;
+    c.includeInNav = false; // baseline holds EVERY company at Carta marks
+    c.exited = false;
+    c.futureDilution = 0;
+    c.waterfallMode = false; // baseline uses the flat reprice, not the preference waterfall
+    c.secondaries = []; // baseline holds the whole stake — no modeled partial sales
+  }
+  return doc;
+}
+
+export function makeSlice({ id, name, from, locked = false, createdAt, color = null }) {
+  return {
+    id,
+    name,
+    locked,
+    color: color ?? null, // optional hex tag shown beside the scenario in the nav
+    createdAt: createdAt ?? new Date().toISOString().slice(0, 10),
+    assumptions: structuredClone(from.assumptions),
+    companies: structuredClone(from.companies),
+  };
+}
+
+// A slice is "shared" once it carries a firm-scenario link (uuid). The sidebar groups
+// on this; a published local scenario gains `shared`, a fork drops it.
+export function isShared(s) {
+  return !!(s && s.shared && s.shared.uuid);
+}
+
+// A shared scenario the user hid from their list — stays on disk so a pull keeps it hidden
+// instead of resurfacing it; "Show hidden" clears the flag. Filtered out of every list.
+export function isHidden(s) {
+  return !!(s && s.shared && s.shared.hidden);
+}
+
+// The envelope carries only integer user ids, so v1 shows self-vs-other, not a real name.
+export function sharedByLabel(slice, currentUserId) {
+  const who = slice?.shared?.updatedBy;
+  return who != null && currentUserId != null && who === currentUserId ? "you" : "another admin";
+}
+
+// A shared scenario built against a different NAV vintage than the viewer's current
+// snapshot. Informational only — re-hydration already applies its knobs to live data.
+export function sharedDrift(slice, snapshot) {
+  const basis = slice?.shared?.snapshotBasis?.navAsOf;
+  const current = snapshot?.source?.navAsOf;
+  return basis && current && basis !== current ? { basis, current } : null;
+}
+
+export function getSlice(doc, id) {
+  return doc.slices.find((s) => s.id === id) ?? doc.slices.find((s) => s.id === BASELINE_ID) ?? doc.slices[0];
+}
+
+export function activeSlice(doc) {
+  return getSlice(doc, doc.activeSliceId);
+}
+
+// On disk a non-baseline slice is an `edits` delta keyed by company id, resolved
+// against the baseline. In memory every slice carries a full `companies` array,
+// so views/models never see the delta: hydrate on load, dehydrate on save. Both
+// tolerate a version-2 slice (full `companies`, no `edits`) as already in its
+// target shape — that is what lets an existing v2 cache load and re-save as v3.
+
+export function hydrateSlice(slice, baselineCompanies) {
+  if (!slice.edits) return slice; // baseline, v2, or already hydrated
+  const companies = baselineCompanies.map((base) => {
+    const c = structuredClone(base);
+    const e = slice.edits[c.id];
+    if (e) for (const f of EDIT_FIELDS) if (f in e) c[f] = e[f];
+    return c;
+  });
+  const { edits, ...rest } = slice;
+  return { ...rest, companies };
+}
+
+/** Field-level equality for the delta. `secondaries` is an array, and `!==` on
+ *  two arrays is always true — that would write an edit for every company on
+ *  every save. Scalars keep the cheap identity compare. */
+function sameFieldValue(a, b) {
+  if (a === b) return true;
+  // "no secondaries" is spelled both ways — absent on a fresh baseline company,
+  // [] once the editor has touched it. Neither is an edit worth persisting.
+  const empty = (v) => v == null || (Array.isArray(v) && v.length === 0);
+  if (empty(a) && empty(b)) return true;
+  if (a && b && typeof a === "object" && typeof b === "object") {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+  return false;
+}
+
+export function dehydrateSlice(slice, baselineCompanies) {
+  if (!slice.companies) return slice; // already dehydrated
+  if (slice.id === BASELINE_ID) return slice; // baseline stays a full copy
+  const baseById = new Map(baselineCompanies.map((c) => [c.id, c]));
+  const edits = {};
+  for (const c of slice.companies) {
+    const base = baseById.get(c.id);
+    if (!base) continue; // drop companies absent from baseline (same rule as reconcile)
+    const delta = {};
+    for (const f of EDIT_FIELDS) if (!sameFieldValue(c[f], base[f])) delta[f] = c[f];
+    if (Object.keys(delta).length) edits[c.id] = delta;
+  }
+  const { companies, ...rest } = slice;
+  return { ...rest, edits };
+}
+
+export function hydrateDoc(doc) {
+  if (!doc || !Array.isArray(doc.slices)) return doc;
+  const base = getSlice(doc, BASELINE_ID)?.companies;
+  if (!Array.isArray(base)) return doc; // no baseline to resolve against
+  return { ...doc, slices: doc.slices.map((s) => hydrateSlice(s, base)) };
+}
+
+export function dehydrateDoc(doc) {
+  if (!doc || !Array.isArray(doc.slices)) return doc;
+  const base = getSlice(doc, BASELINE_ID)?.companies;
+  if (!Array.isArray(base)) return doc;
+  // Stamp v3 so a persisted file's `version` matches its edits shape — a v2 cache
+  // edited in-app saves as v3 here, mirroring build_datadir.py's refresh path.
+  return { ...doc, version: 3, slices: doc.slices.map((s) => dehydrateSlice(s, base)) };
+}
+
+/** Companies holding positions in a fund (live ones only). Defunct companies
+ *  are individually uneditable (UI lock) but fund-level zero/reset DO include
+ *  them — a written-off fund zeroes its dead companies' stale Carta marks too. */
+export function companiesInFund(body, fundId) {
+  return body.companies.filter((c) => !c.archived && c.positions.some((p) => p.fundId === fundId));
+}
+
+/**
+ * Write off every company in a fund: tapes to zero, connected to NAV.
+ * Repriced FV, position tables, and fund NAV all read zero — then write up
+ * only the survivors by dragging their tapes back. Companies that also hold
+ * positions in OTHER funds get zeroed everywhere (the tape is company-level);
+ * surface those via crossFundCompanies() before calling.
+ */
+export function zeroOutFund(body, fundId) {
+  for (const c of companiesInFund(body, fundId)) {
+    c.includeInNav = true;
+    // zero BOTH modes — a mixed company (some positions with a basis, some
+    // without) reprices per-position, so one input alone wouldn't zero it
+    c.valuationB = 0;
+    c.markMultiple = 0;
+    c.waterfallMode = false; // a write-off is a flat $0, not a waterfall exit
+  }
+  return body;
+}
+
+/** Undo: every company in the fund back to Carta marks (parked, disconnected). */
+export function resetFundToCarta(body, fundId) {
+  for (const c of companiesInFund(body, fundId)) {
+    c.valuationB = c.defaultValuationB ?? null;
+    c.markMultiple = 1;
+    c.includeInNav = false;
+    c.exited = false;
+    c.futureDilution = 0;
+    c.waterfallMode = false;
+    c.secondaries = [];
+  }
+  return body;
+}
+
+/** Companies a fund-level zero would also affect elsewhere. */
+export function crossFundCompanies(body, fundId) {
+  return companiesInFund(body, fundId).filter((c) => c.positions.some((p) => p.fundId !== fundId));
+}
+
+/** Firm-wide write-off: every non-archived company across every fund, tapes to zero. */
+export function zeroOutAll(body) {
+  for (const c of body.companies.filter((c) => !c.archived)) {
+    c.includeInNav = true;
+    c.valuationB = 0;
+    c.markMultiple = 0;
+    c.waterfallMode = false;
+  }
+  return body;
+}
+
+/** Firm-wide undo: every non-archived company back to Carta marks. */
+export function resetAllToCarta(body) {
+  for (const c of body.companies.filter((c) => !c.archived)) {
+    c.valuationB = c.defaultValuationB ?? null;
+    c.markMultiple = 1;
+    c.includeInNav = false;
+    c.exited = false;
+    c.futureDilution = 0;
+    c.waterfallMode = false;
+    c.secondaries = [];
+  }
+  return body;
+}
+
+/**
+ * Reserve strategy — a follow-on posture applied across a scope, expressed as
+ * expected future dilution: reserving to follow-on pro-rata DEFENDS ownership
+ * (less dilution), so an aggressive posture => ~0 dilution, conservative =>
+ * full expected dilution. Sets each eligible company's `futureDilution` and
+ * marks it live in NAV (dilution only bites once includeInNav is true — same as
+ * the per-company dilution slider). Skips realized/defunct; preserves any
+ * existing valuationB/markMultiple reprice (dilution stacks on top).
+ * `fundId === "all"` applies firm-wide; otherwise scoped to that fund.
+ */
+export function applyReserveDilution(body, fundId, dilution) {
+  const targets = fundId === "all"
+    ? body.companies.filter((c) => !c.archived)
+    : companiesInFund(body, fundId);
+  for (const c of targets) {
+    if (c.realized || c.defunct) continue;
+    c.futureDilution = dilution;
+    c.includeInNav = true;
+  }
+  return body;
+}
+
+export function sliceId(name) {
+  return (
+    name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") +
+    "-" + Math.random().toString(36).slice(2, 6)
+  );
+}
+
+/** True if a slice's inputs differ from another's (valuations, toggles, assumptions). */
+export function sliceDiffers(a, b) {
+  const sig = (s) =>
+    JSON.stringify([
+      s.assumptions.carryRate,
+      s.assumptions.carryRates ?? {},
+      s.assumptions.spRate,
+      s.assumptions.feeLoads ?? {},
+      s.assumptions.followOnRatios ?? {},
+      s.assumptions.recyclingRatios ?? {},
+      s.companies.map((c) => [c.id, ...EDIT_FIELDS.map((f) => c[f]), c.positions.length]),
+    ]);
+  return sig(a) !== sig(b);
+}

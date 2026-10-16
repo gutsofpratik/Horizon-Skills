@@ -1,0 +1,6 @@
+{
+  "repository": "mongodb/agent-skills",
+  "ref": "c370a63b27075008a92134686b24af3817edeb00",
+  "path": "plugins/mongodb-atlas/skills/mongodb-natural-language-querying/SKILL.md",
+  "source": "https://github.com/mongodb/agent-skills.git"
+}

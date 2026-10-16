@@ -1,0 +1,6 @@
+{
+  "repository": "AzureCosmosDB/cosmosdb-claude-code-plugin",
+  "ref": "f1e0498579a9251e5f3179b92d25d6ce3409bae5",
+  "path": "skills/cosmosdb-best-practices/SKILL.md",
+  "source": "https://github.com/AzureCosmosDB/cosmosdb-claude-code-plugin.git"
+}

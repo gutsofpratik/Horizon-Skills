@@ -1,0 +1,6 @@
+{
+  "repository": "neondatabase/agent-skills",
+  "ref": "default",
+  "path": "plugins/neon-postgres/skills/neon-realtime/SKILL.md",
+  "source": "https://github.com/neondatabase/agent-skills"
+}

@@ -1,0 +1,309 @@
+---
+name: rill-development
+description: Overview of how to develop a Rill project
+---
+
+# Instructions for developing a Rill project
+
+This document is intended for data engineering agents specialized in developing projects in the Rill business intelligence platform.
+
+## Introduction to Rill
+
+Rill is a business intelligence platform built around the following principles:
+- Code-first: configure projects using versioned and reproducible source code in the form of YAML and SQL files.
+- Full stack: go from raw data sources to user-friendly dashboards powered by clean data with a single tool.
+- Declarative: describe your business logic and Rill automatically runs the infrastructure, migrations and services necessary to make it real.
+- OLAP databases: you can easily provision a fast analytical database and load data into it to build dashboards that stay interactive at scale.
+
+## Project structure
+
+A Rill project consists of resources that are defined using YAML and SQL files in the project's file directory.
+Rill supports different resource types, such as connectors, models, metrics views, explore dashboards, and more.
+
+Here is an example listing of files for a small Rill project:
+```
+.env
+connectors/duckdb.yaml
+connectors/s3.yaml
+models/events_raw.yaml
+models/events.sql
+metrics/events.yaml
+rill.yaml
+```
+
+Note that there is no separate dashboard file: the explore dashboard for `metrics/events.yaml` is defined inline in the metrics view file (see the "Explores" section below).
+
+Let's start with the project-wide files at the root of the directory:
+- `rill.yaml` is a required file that contains project-wide configuration. It can be compared to `package.json` in Node.js or `dbt_project.yml` in dbt.
+- `.env` is an optional file containing environment variables, usually secrets such as database credentials.
+
+The other YAML and SQL files define individual resources in the project. They follow a few rules:
+- The YAML files must contain a `type:` property that identifies the resource type. The other properties in the file are specific to the selected resource type.
+- SQL files are a convenient way of creating model resources. They are equivalent to a YAML file with `type: model` and a `sql:` property.
+- Each file declares one main resource, but may in some cases also emit some dependent resources with internally generated names.
+- The main resource declared by a file gets a unique name derived from the filename by removing the directory name and extension. For example, `connectors/duckdb.yaml` defines a connector called `duckdb`.
+- Directories are ignored by the parser and can be used to organize the project as you see fit. Small projects often have one directory per resource type.
+- Resources can reference other resources, which forms a dependency graph (DAG) that informs the sequence they are executed.
+- Resource names are unique within a resource type. For example, only one model can be named `events` (regardless of directory), but it is possible for both a model and a metrics view to be called `events`.
+- Clear resource names are important as they are widely used as unique identifiers throughout the platform (e.g. in CLI commands, URL slugs, API calls). They are usually lowercase and snake case, but that is not enforced.
+- Any resource can carry a top-level `tags:` list (free-form labels) for organizing and filtering resources across a project. Distinct from dimension/measure tags inside a metrics view.
+
+## Project execution
+
+Rill automatically watches project files and processes changes. There are two key phases:
+- **Parsing**: Files are converted into resources and organized into a DAG. Malformed files produce *parse errors*.
+- **Reconciliation**: Resources are executed to achieve their desired state. Failures produce *reconcile errors*.
+
+Some resources are cheap to reconcile (validation, non-materialized models), others are expensive (materialized models, managed connectors). Be cautious with expensive operations; see resource-specific instructions for details.
+
+Resources can also have scheduled reconciliation via cron expressions (e.g. daily model refresh).
+
+## Rill's environments
+
+Rill has a local CLI (`rill`) for development and a cloud service for production. After developing or changing a project locally, developers deploy to Rill Cloud either by pushing to GitHub (continuous deploys) or manually deploying with the CLI.
+
+## OLAP databases
+
+Rill places high emphasis on "operational intelligence", meaning low-latency, high-performance, drill-down dashboards with support for alerts and scheduled reports.
+Rill supports these features using OLAP databases and has drivers that are heavily optimized to leverage database-specific features to get high performance.
+
+OLAP databases are configured as any other connector in Rill.
+People can either connect an external OLAP database with existing tables, or can ask Rill to provision an empty OLAP database for them, which they can load data into using Rill's `model` resource type.
+
+OLAP connectors are currently the only connectors that can directly power the metrics views resources that in turn power dashboards. So data must be in an OLAP database to power a dashboard.
+
+Since OLAP databases have a special role in Rill, every project must have a _default_ OLAP connector that you configure using the `olap_connector:` property in `rill.yaml`. This default OLAP connector is automatically used for a variety of things in Rill unless explicitly overridden (see details under the resource type descriptions). If no OLAP connector is configured, Rill by default initializes a managed `duckdb` OLAP database and uses it as the default OLAP connector.
+
+## Resource types
+
+The sections below contain descriptions of the different resource types that Rill supports and when to use them.
+The descriptions are high-level; you can find detailed descriptions and examples in the separate resource-specific instruction files.
+
+### Connectors
+
+Connectors are resources containing credentials and settings for connecting to an external system.
+They are usually lightweight as their reconcile logic usually only validates the connection.
+They are normally found at the root of the DAG, powering other downstream resource types.
+
+There are a variety of built-in connector _drivers_, which each implements one or more capabilities:
+- **OLAP database:** can power dashboards (e.g. `duckdb`, `clickhouse`, `druid`, `pinot`, `starrocks`, and `snowflake`, `bigquery`, `databricks` as live connectors)
+- **SQL database:** can run SQL queries and models (e.g. `postgres`, `bigquery`, `snowflake`)
+- **Information schema:** can list tables and their schemas (e.g. `duckdb`, `bigquery`, `postgres`)
+- **Object store:** can list, read and write flat files (e.g. `s3`)
+- **Notifier:** can send notifications (e.g. `slack`)
+- **AI:** can generate embeddings or responses (e.g. `openai`, `claude`, `gemini`)
+
+Here are some useful things to know when developing connectors:
+- Actual secrets like database passwords should go in `.env` and be referenced from the connector's YAML file
+- Connectors are usually called the same as their driver, unless there are multiple connectors that use the same driver.
+- OLAP connectors with the property `managed: true` will automatically be provisioned by Rill, so you don't need to handle the infrastructure or credentials directly. This is only supported for the `duckdb` and `clickhouse` drivers. The user will be subject to usage-based billing for the CPU, memory and disk usage of the provisioned database.
+- User-configured OLAP connectors with externally managed tables should have `mode: read` to protect from unintended writes from Rill models.
+- The primary OLAP connector used in a project should be configured in `rill.yaml` using the `olap_connector:` property.
+
+### Models
+
+Models are resources that specify ETL or transformation logic that outputs a tabular dataset in one of the project's connectors.
+They are usually expensive resources that are found near the root of the DAG, referencing only connectors and other models.
+
+Models usually (and by default) output data as a table with the same name as the model in the project's default OLAP connector.
+They usually center around a `SELECT` SQL statement that Rill will run as a `CREATE TABLE <name> AS <SELECT statement>`.
+This means models in Rill are similar to models in dbt, but they support some additional advanced features, namely:
+- Different input and output connectors (making it easy to e.g. run a query in BigQuery and output it to the default OLAP connector)
+- Stateful incremental ingestion with support for explicit partitions (e.g. for loading Hive partitioned files from S3)
+- Scheduled refresh using a cron expression in the model itself
+
+When reasoning about a model, it can be helpful to think in terms of the following attributes:
+- **Source model:** references external data, usually reading data from a SQL or object store connector and writing it into an OLAP connector
+- **Derived model:** references other models, usually doing joins or formatting columns to prepare a denormalized table suitable for use in metrics views and dashboards 
+- **Materialized model:** outputs a physical table (i.e. not just a SQL view)
+- **Incremental model:** has logic for incrementally loading data
+- **Partitioned model:** capable of loading data in well-defined increments, such as daily partitions, enabling scalability and idempotent incremental runs
+
+Models are usually expensive resources that can take a long time to run, and should be created or edited with caution.
+The only exception is non-materialized models that have the same input and output connector, which get created as cheap SQL views.
+In development, you can avoid expensive operations by adding a "dev partition", which limits data processed to a subset. See the instructions for model development for details.
+
+### Metrics views
+
+Metrics views are resources that define queryable business metrics on top of a table in an OLAP database.
+They implement what other business intelligence tools call a "semantic layer" or "metrics layer".
+They are lightweight resources found downstream of connectors and models in the DAG.
+They power many user-facing features, such as dashboards, alerts, and scheduled reports.
+
+Metrics views consist of:
+- **Model:** a table in an OLAP database; can either be a pre-existing table in an external OLAP database or a table produced by a model in the Rill project
+- **Dimensions:** SQL expressions that can be grouped by (e.g. time, string or geospatial types)
+- **Measures:** SQL expressions that define aggregations (usually numeric types)
+- **Security policies:** access rules and row filters that reference attributes of the querying user
+
+A metrics view can also be a *derived metrics view* that sets `parent:` (instead of `model:`) to inherit the data source, dimensions and measures of another metrics view, exposing only a selected subset of them. Derived metrics views cannot define their own dimensions or measures; see the metrics view instructions for details.
+
+### Explores
+
+Explore resources define an "explore dashboard", an opinionated dashboard type that comes baked into Rill.
+These dashboards are specifically designed as an explorative, drill-down, slice-and-dice interface for a single metrics view.
+They are Rill's default dashboard type, and usually configured for every metrics view in a project.
+They are lightweight resources that are always found downstream of a metrics view in the DAG.
+
+By default, an explore is defined inline in its metrics view file using an `explore:` block (see the metrics view instructions for details).
+The inline block is the dashboard: Rill emits an explore resource from it, and it shows up in the project like any other dashboard.
+Do NOT also create a stand-alone `type: explore` file for the same metrics view; that produces a second, duplicate dashboard, which confuses users.
+Only create a stand-alone explore file when a metrics view needs more than one explore dashboard, or when the user explicitly asks for one.
+The only required configuration is a metrics view to render, but you can optionally also configure things like a theme, default dimension and measures to show, time range presets, and more.
+
+### Canvases
+
+Canvas resources configure a "canvas dashboard", which is a free-form dashboard type consisting of custom chart and table components laid out in a grid.
+They enable users to build overview/report style dashboards with limited drill-down options, similar to those found in traditional business intelligence tools.
+
+Canvas dashboards support a long list of component types, including line charts, bar charts, pie charts, markdown text, tables, and more.
+All components are defined in the canvas file, but each component is emitted as a separate resource of type `component`, which gets placed upstream of the canvas in the project DAG.
+Each canvas component fetches data individually, almost always from a metrics view resource; so you often find metrics view resources upstream of components in the DAG.
+
+### Themes
+
+Themes are resources that define a custom color palette for a Rill project.
+They are referenced from `rill.yaml` or directly from an explore or canvas dashboards.
+
+### Custom APIs
+
+Custom APIs are resources that define a query that serves data from the Rill project on a custom endpoint.
+They are advanced resources that enable easy programmatic integration with a Rill project.
+They are lightweight resources that are usually found downstream of metrics views in the DAG (but sometimes directly downstream of a connector or model).
+
+Custom APIs are mounted as `GET` and `POST` REST APIs on `<project URL>/api/<resource name>`.
+The queries can use templating to inject request parameters or user attributes.
+
+Rill supports a number of different "data resolver" types, which execute queries and return data.
+The most common ones are:
+- `metrics_sql`: queries a metrics view using a generic SQL syntax (recommended)
+- `metrics`: queries a metrics view using a structured query object
+- `sql`: queries an OLAP connector using a raw SQL query in its native SQL dialect
+
+### Alerts
+
+Alerts are resources that enable sending alerts when certain criteria matches data in the Rill project.
+They consists of a refresh schedule, a query to execute, and notification settings.
+Since they repeatedly run a query, they are slightly expensive resources.
+They are usually found downstream of a metrics view in the DAG.
+Most projects don't define alerts directly as files; instead, users can define alerts using a UI in Rill Cloud.
+
+### Reports
+
+Reports are resources that enable sending scheduled reports of data in the project.
+They consists of a delivery schedule, a query to execute, and delivery settings.
+Since they repeatedly run a query, they are slightly expensive resources.
+They are usually found downstream of a metrics view in the DAG.
+Most projects don't define reports directly as files; instead, users can define reports using a UI in Rill Cloud.
+
+### Skills
+
+Skills teach Rill's AI agents project-specific practices, such as analysis playbooks (e.g. how to do root-cause analysis for a revenue drop) and business glossaries.
+A skill is a directory containing a `SKILL.md` file that follows the Agent Skills format (https://agentskills.io): YAML front matter followed by a markdown body with the instructions.
+Rill loads skills from `skills/<name>/SKILL.md`, and also from `.agents/skills/<name>/SKILL.md` for compatibility with skills authored for other agent clients.
+The front matter supports these properties:
+- `description:` (required) a short summary used to decide when the skill applies; write it as "what it does + when to use it"
+- `name:` always include it (the Agent Skills format requires it, even though Rill derives it from the directory when omitted); must match the directory name; lowercase letters, numbers and hyphens only
+- `metrics_views:` (optional, Rill extension) list of metrics view names the skill is relevant to; the analyst uses it to decide when to load the skill
+- `agents:` (optional, Rill extension) list of agents the skill applies to, `analyst` and/or `developer`; defaults to `[developer]`, so analysis skills must set `agents: [analyst]`
+- `always_apply:` (optional, Rill extension) if `true`, the skill is loaded up front in every conversation instead of on demand; use for short, broadly applicable guidance such as glossaries
+
+Skill contents are visible to every user who can use AI features in the project, so they must never contain secrets.
+
+### `rill.yaml`
+
+`rill.yaml` is a required file for project-wide config found at the root directory of a Rill project.
+It is mainly used for:
+- Setting shared properties for all resources of a given type (e.g. giving all dashboards the same theme)
+- Setting default values for non-sensitive environment variables
+- Customizing feature flags
+- Configuring mock users for testing security policies locally
+
+### `.env`
+
+`.env` is an optional file containing environment variables, which Rill loads when running the project.
+Other resources can reference these environment variables using a templating syntax.
+By convention, environment variables in Rill use snake-case, lowercase names (this differs from shell environment variables).
+
+## Development process
+
+This section describes the recommended workflow for developing resources in a Rill project.
+
+### Understanding the task
+
+Before making changes, determine what kind of task you are performing:
+- **Querying**: If you need to answer a question about data in the project, use query tools but do not modify files.
+- **Surgical edit**: If you need to create or update a single resource, focus on that resource and its immediate dependencies.
+- **Full pipeline**: If you need to go from raw data to dashboard, expect your changes to cover a sequential pipeline through connector(s), source model(s), derived model(s), and metrics view(s) with an inline explore dashboard (plus optionally a canvas dashboard).
+
+### Checking project capabilities
+
+Before proceeding, verify what the project supports:
+- **Write access**: Do you have access to modify files in the project? If not, you are limited to explaining the project or guiding the developer.
+- **Data access**: Does the project have a connector for the relevant data source? If not, you need to create a connector and add the required credentials to `.env`, then ask the user to populate those values before continuing.
+- **OLAP mode**: Is the default OLAP connector read-only or readwrite? If read-only, you cannot create models; instead, create metrics views and dashboards directly on existing tables in the OLAP database.
+
+### Recommended workflow
+
+Your workflow will depend on the kind of task you are undertaking. Here follows an idealized workflow for a full data source to dashboard journey:
+
+1. **Survey existing resources**: Check what resources already exist in the project using the project status and file tools. You may be able to reuse or extend existing models, metrics views, or dashboards rather than creating new ones.
+2. **Explore available data**: Use connector introspection tools to discover what tables or files are available. For SQL databases, query the information schema. For object stores, list buckets and files.
+3. **Handle missing data**: If the project lacks access to the data you need, ask the user whether to generate mock data or help them configure a connector to their data source.
+4. **Create or update models** (managed or readwrite OLAP only): Build models that ingest and transform data into denormalized tables suitable for dashboard queries. Materialize models that involve expensive joins or aggregations. Use dev partitions to limit data during development.
+5. **Profile the data**: Before creating a metrics view, look at the schema of the underlying model/table to understand its shape. This informs which dimensions and measures you create. Consider using the SQL query tool to do a couple well-chosen queries to the table to get row counts, cardinality of important columns, example column values, date ranges, or similar. Be very careful not to run too many queries or expensive queries.
+6. **Create or update the metrics view**: Define dimensions and measures using columns in the underlying model/table. Start small with one time dimension (timeseries), up to 10 dimensions and up to 5 measures, and add more later if relevant.
+7. **Ensure there are dashboards**: The inline `explore:` block in the metrics view (created in the previous step) is the explore dashboard for drill-down analysis; there is nothing more to create for it. Do not create a separate `type: explore` file for the same metrics view. If the user wants an overview or report-style view, also create a canvas dashboard with components from one or more metrics views.
+8. **Check for errors and keep iterating until they are fixed:** At each stage, check if there is a parse or reconcile error, and if there is, keep updating the relevant file(s) to fix the error.
+
+
+### Available tools
+
+The following tools are typically available for project development:
+
+- `project_status` for checking resource names and their current status (idle, running, error); supports `wait_until_idle` to block until reconciliation completes (use this if you just made a change and want to wait until it succeeds/errors); can also return recent logs, but they should be used sparingly and only for debugging a specific issue reported in the resource-level status overview
+- `query_sql` for running SQL against a connector; use `SELECT` statements with `LIMIT` clauses and low timeouts, and be mindful of performance or making too many queries
+- `query_metrics_view` for querying a metrics view; useful for answering data questions and validating dashboard behavior
+- `list_tables` and `show_table` for accessing the information schema of a database connector
+- `list_buckets` and `list_bucket_files` for exploring files in object stores like S3 or GCS; to preview file contents, load one file into a table using a model and query it with `query_sql`
+
+
+
+
+### What to do when tools are not available
+
+You may be running in an external editor that does not have Rill's development MCP server on `localhost:9009` connected. If that is the case, you will need to approach your work differently because you can't run tool calls like `list_tables`, `query_sql` or `project_status`. Instead:
+1. Use the `rill validate` CLI command to validate the project and get the status of different resources.
+2. Be more bold in making changes, and rely on `rill validate` or user feedback to inform you of issues.
+
+### Loading documentation
+
+Before creating or editing a resource, you MUST try to load a skill for its resource type. The skill is important because it documents the available properties and best practices. Do NOT guess at properties or rely on memory.
+
+For example, if you are going to modify a metrics view and have access to the `rill-metrics-view` skill, you must load it first.
+
+If you don't have access to a matching skill, try searching the reference documentation on https://docs.rilldata.com.
+
+
+
+### Common pitfalls
+
+Avoid these mistakes when developing a project:
+- **Inspecting Rill's internal state with external tools**: Never attempt to inspect Rill's internal state in the project's `tmp` directory (or elsewhere) using external tools. In particular, do not point the `duckdb` CLI (or any other external database client) at the files Rill manages there; Rill uses a custom setup that makes this approach fail. Only ever inspect Rill's internal state through the `rill` CLI or the APIs/MCP tools that Rill exposes (e.g. `query_sql`, `show_table`, `project_status`).
+- **Duplicating ETL logic**: Ingest data once, then derive from it within the project. Do not create multiple models that pull the same data from an external source.
+- **Models as SQL files:** Always create new models as `.yaml` files, not `.sql` files (which are harder to extend later).
+- **Not creating connector files:** When Rill has native support for a connector (like S3 or BigQuery), always create a dedicated connector resource file for it.
+- **Forgetting to materialize**: Always materialize models that reference external data or perform expensive operations. This also includes models that load external data using a native SQL function, like `read_parquet(...)` or `s3(...)`. Non-materialized models become views, which re-execute on every query.
+- **Referencing non-existant environment variables:** Only reference environment variables that are present in `.env` (returned in `env` from `project_status`). If you need the user to add another environment variable, navigate to the `.env` file and stop with a message asking the user to manually add the required environment variable(s).
+- **Processing too much data in development**: Use dev partitions to limit data to a small subset (e.g., one day) during development. This speeds up iteration and avoids unnecessary costs.
+- **Creating a duplicate explore dashboard**: A metrics view with an inline `explore:` block (or a legacy metrics view without `version:`) already emits an explore dashboard. Never add a stand-alone `type: explore` file for such a metrics view; it produces a second dashboard for the same data. To change the dashboard, edit the `explore:` block in the metrics view file instead.
+- **Not adding a time dimension (timeseries) in metrics views**: Metrics views are much more useful when they have a time dimension. Make sure to set one of them as the primary time dimension using the `timeseries:` property.
+- **Being deceived by logs from `project_status`:** If you retrieve logs from the `project_status` tool, be aware that issues highlighted in the logs may have already been fixed. Only use the logs to debug errors indicated by the resource-level status.
+- **Using deprecated properties:** Never use a YAML property that is marked as deprecated for the resource type, even if it seems like a convenient way to solve your problem. The only exception is if the deprecated property is already present in the file you are editing. Find a non-deprecated alternative or give up.
+- **Adding undocumented properties:** Never add properties to a YAML file that are not documented for that resource type. For example, do not add a `description` property to a resource type that does not support it. Only use properties that are explicitly described in the documentation or resource schema.
+- **Removing supported properties:** Before removing or "converting" a property because you believe it is unsupported, verify against the resource schema. When in doubt, assume an existing property is intentional and leave it as is unless it's the source of error.
+- **Modifying user-provided values:** Never alter literal values the user has written, such as string constants, URLs names, or SQL expressions. Such values are often intentional and changing them silently can break behavior. If you genuinely believe a value is wrong, mention it in your final response instead of editing it.
+- **Inferring properties from names:** Do not add or change a property based on a naming heuristic. For example, do not set or change a dimension's `type: time` just because its column is named `time`; Rill infers dimension and column types from the underlying data. Only set such a property when the documentation calls for it or the user explicitly asks.
+- **Over-fixing when resolving errors:** When your task is to fix a specific error, make the minimal change needed to resolve exactly that error. Do not reformat, rewrite, or "improve" other parts of the file that are not causing the error.
+
+

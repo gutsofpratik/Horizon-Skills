@@ -1,0 +1,296 @@
+
+<!-- Part of the official Carta AI Agent Plugin -->
+
+# Schedule of Investments (SOI) Live Artifact
+
+Render a firm's Schedule of Investments as a persistent, refreshable Live Artifact in the Cowork sidebar. There is one artifact per firm; the dropdown in the header lets users switch between every fund they have access to in that firm. The artifact queries the Carta data warehouse on load and on each fund switch, so the data is always current. Re-invoking the skill for the same firm rebuilds the artifact with the freshly-enumerated fund list — newly-added funds appear automatically.
+
+## When to Use
+
+- "Show me the SOI for [Fund Name]"
+- "What is [Fund Name] invested in?"
+- "Give me [Fund Name]'s schedule of investments"
+- "Show me [Fund Name]'s portfolio breakdown"
+- "What are [Fund Name]'s holdings?"
+- "Show me the SOIs for [Firm Name]" (no specific fund named)
+- "What is [Fund Name] invested in, including look-through to underlying funds" (fund-of-funds firms — see Step 2b)
+
+## Prerequisites
+
+- The user must have the Carta MCP server connected
+- The user must be in Cowork — Live Artifacts only render there
+- The user must have access to the firm and at least one fund within it
+
+## User-facing output
+
+Customer-facing narration should sound like a person, not an implementer. The customer asked to see a fund's Schedule of Investments — they don't care about step numbers, UUIDs, MCP discovery, "templates", or "render scripts". Quiet implementation; loud delivery.
+
+**Phase-by-phase guidance:**
+
+- **On invocation** — One short sentence by fund name or firm name, e.g. *"Pulling the Schedule of Investments for Acme Ventures Fund III…"* or *"Pulling Acme Capital's funds…"*
+- **During Steps 1–5 (the mechanical middle)** — Say *"Building your view…"* once after the opening acknowledgment. Nothing else.
+- **On disambiguation** — Use `AskUserQuestion` with a clean prompt naming the candidate funds. Don't explain *why* you're asking.
+- **On the final delivery (Step 6)** — One friendly delivery sentence (see Step 6) plus a 3–5 bullet summary of what the artifact shows.
+
+**Do NOT:**
+
+- Number the steps in user-visible text ("Step 1 — checking firm context", "Step 2 & 3 — finding funds and MCP tool").
+- Surface internals: fund UUIDs, MCP tool prefixes, "the render script", "the artifact template", "inject placeholders", "set firm context", "discover the Carta MCP", "writing the fund list file".
+- Print "Perfect!" / "Excellent!" / "Great!" / "Done!" between every tool call. One natural confirmation at the end is enough.
+
+## Workflow
+
+### Step 1 — Set firm context if needed
+
+If the user's accessible firms are already in your conversation context (e.g. from a prior `welcome` Carta MCP tool call), use that list. Otherwise, call `list_contexts` to enumerate them.
+
+With the firm list in hand:
+- If only one firm is accessible, call `set_context` with it.
+- If multiple are accessible, try to infer which firm the user means from their request (firm name, fund name, or any other hint). If you can't pick confidently, ask via `AskUserQuestion`. Then call `set_context`.
+
+**Capture both the firm name and firm UUID** — you'll pass the name to the render script in Step 4 (eyebrow display) and the UUID twice: once to the render script and again as the `firm_id` the artifact uses to pin context on every load.
+
+### Step 2 — Enumerate the firm's funds
+
+> **Run in parallel with Step 3.** Fund enumeration (this step) and MCP UUID discovery (Step 3) are fully independent — issue both tool batches concurrently in the same response, not sequentially. 
+
+Call `read_tool({"name": "fa__list__entities", "arguments": { entity_types: "fund,spv" }})`. The filter excludes entity types that can't hold investments so it is critical. Capture the full `[{uuid, name, currency, fund_family_id, fund_family_name, is_churned, service_stop_date}, ...]` list from the response — the `currency` field is the fund's reporting currency (e.g. `"USD"`, `"EUR"`) and is needed for correct amount formatting in the artifact. `fund_family_name` is non-null for funds that belong to a fund family (e.g. side-by-side vehicles of the same strategy) and null/absent for standalone funds — carry it through verbatim to Step 4a so the artifact can group the fund dropdown by family. This response does **not** include `vintage_date` — see Step 2c.
+
+**Drop churned funds before anything else.** The response lists every fund the firm has ever had, including ones Carta no longer services — a churned fund's figures stopped updating on its service stop date, so it would read as current when it isn't. Each entry carries `is_churned` and `service_stop_date`: drop the fund when `service_stop_date` is today or earlier, or when `is_churned` is `true` and `service_stop_date` is null. A stop date still in the future means Carta services the fund until then, so keep it even if `is_churned` is already `true`. Everything after this — the initial-fund pick below, the single-fund rule, Step 2c, the Step 4a funds file — works on the list with churned funds removed. If the user named a fund, match their name against the full list first, so you know whether they asked for a churned one. Two exceptions:
+
+- **The user named a churned fund.** Keep that one fund (only that one) and make it the initial selection — hiding a fund someone asked for by name reads as a bug. Record `named_churned = true` and its `service_stop_date` for Step 6.
+- **Every fund is churned.** Keep them all rather than render an empty picker, and record `all_churned = true` for Step 6.
+
+**Pick the initial fund** for the dropdown and capture two variables — `initial_fund_uuid` and `name_status` — that Step 6 will read by name.
+
+| Situation | `initial_fund_uuid` | `name_status` | Also capture |
+|---|---|---|---|
+| User named a fund, **one** match | the matched fund's uuid | `named_and_found` | — |
+| User named a fund, **multiple** matches | the user-chosen uuid (via `AskUserQuestion`) | `named_and_found` | — |
+| User named a fund, **no** match | `__all_entities__` | `named_but_missing` | `named_term` = the term the user used |
+| User did not name a fund, firm has **< 40** funds | the first fund or fund family in the vintage-sorted order from Step 2c | `unnamed` | — |
+| User did not name a fund, firm has **≥ 40** funds | `__all_entities__` | `unnamed` | — |
+
+`__all_entities__` opens the artifact on the pooled firm-wide view — every fund at
+once, with a Held By column naming which fund holds each position. Most firms want
+the whole portfolio first and narrow from there, so an unasked-for single fund is
+the wrong opening shot for a firm small enough to actually see its whole book at once.
+Above the 40-fund line, though, "whole book" stops being readable as one table —
+default those firms to their most recent fund (or fund family) instead, and let
+them pool up manually when they want to. Pass the sentinel through verbatim when
+it applies; the render script accepts it in place of a fund UUID.
+
+The fund-count check needs Step 2's full fund list, so it can't run until Step 2
+(and, for the vintage-sorted pick, Step 2c) has returned — this is a one-time count
+of `fa__list__entities` results, not a live threshold.
+
+**A single-fund firm can't pool.** The artifact only offers the firm-wide option
+when there is more than one fund, and the render script rejects the sentinel below
+two — so for a one-fund firm, use that fund's uuid regardless of the table above.
+
+`named_but_missing` is **not** a blocker — render the artifact with the full firm fund list anyway. The user can pick their intended fund from the dropdown; Step 6 surfaces the miss in the confirmation message.
+
+### Step 2b — Fund-of-funds look-through (no action needed, narration only)
+
+The rendered artifact **always** carries fund-of-funds look-through support — drill-down into `UNDERLYING_INVESTMENTS`/`_HISTORY`, bulk prefetch, tranche merging, cross-fund search, and the as-of quarter selector are baked into `artifact.html`/`render-artifact.py` and self-gate on the data: a company row only gets an expand affordance when its own `ASSET_CLASS_TYPE = 'FUND_INVESTMENT'` positions exist for that fund. There is nothing to check and nothing to load before Step 4 — the template is identical for every firm.
+
+The only thing this step affects is **narration**. If you already know (from the user's request, or from having looked at this firm before) that it holds LP interests in other funds, you may mention look-through in the Step 6 bullet summary (e.g. "drill into each fund-of-funds position to see the underlying portfolio"). Otherwise say nothing about it — don't run a probe query just to decide whether to mention it. See `${CLAUDE_PLUGIN_ROOT}/skills/carta-portfolio-analytics-routing/references/soi/lookthrough.md` for the query patterns and data-quality notes behind this feature, useful for debugging or explaining behavior, not for deciding whether to render it.
+
+### Step 2c — Vintage dates and duplicate-fund cleanup
+
+Run one dwh query, scoped to every fund UUID from Step 2:
+
+```sql
+SELECT FUND_UUID, FUND_NAME, VINTAGE_DATE, FUND_SIZE, IS_ADMINISTERED_BY_CARTA
+FROM FUND_ADMIN.FUNDS
+WHERE FUND_UUID IN (<all fund uuids from Step 2>)
+```
+
+Use the result for two things:
+
+1. **Vintage dates.** Merge `VINTAGE_DATE` onto the matching fund by `FUND_UUID` — this is where `vintage_date` for Step 4a actually comes from; `fa__list__entities` doesn't return it. Omit the key for a fund whose `VINTAGE_DATE` is null rather than fabricating one.
+2. **Duplicate fund records.** `FUND_ADMIN.FUNDS` can have multiple UUIDs sharing the exact same `FUND_NAME` — usually one real, Carta-administered fund plus dead placeholders. When a name collides across ≥2 rows and **exactly one** of them is a clear "real" record (`IS_ADMINISTERED_BY_CARTA = TRUE` and at least one of `VINTAGE_DATE`/`FUND_SIZE` non-null) while every other colliding row is a clear dead placeholder (`IS_ADMINISTERED_BY_CARTA = FALSE` and both `VINTAGE_DATE` and `FUND_SIZE` null), drop the placeholders from the Step 4a funds list — don't render them as separate dropdown entries. If a name collision doesn't fit that clean pattern (e.g. two rows both look administered, or the signal is ambiguous), leave every colliding row in — don't guess which one to drop.
+
+This step needs the firm's `FUND_UUID`s from Step 2, so it runs after Step 2, not in parallel with it.
+
+### Step 3 — Checks before building
+
+> **Run in parallel with Step 2** — see note in Step 2.
+
+Run both checks before building, and stay quiet about them when they pass:
+
+1. `${CLAUDE_PLUGIN_ROOT}/references/gate-has-artifact-tool.md` — can this session publish at all?
+2. `${CLAUDE_PLUGIN_ROOT}/references/gate-carta-connector-name.md` — the connector name the page will call.
+
+Both sit in the **plugin's** `references/` directory — `${CLAUDE_PLUGIN_ROOT}/references/`,
+alongside the other plugin-wide references. They are *not* under this skill's own
+`references/`. Read them by that exact path; don't search for them.
+
+This is a live artifact: the rendered HTML calls Carta at runtime through `claude.use("mcp")`, so it needs both.
+If the `Artifact` tool is missing, offer to pull the SOI data as a text summary instead.
+
+Store the `name` the connector gate resolves as `CARTA_MCP_SERVER` — Step 4 passes it to
+the render script as positional argument 3, and Step 5 puts it in the `capabilities.mcp`
+grant. It is one string; there is nothing to derive and nothing to keep in sync.
+
+### Step 4 — Write the funds file, then render the template
+
+> **You must NEVER write the artifact HTML manually.** Every render goes through `render-artifact.py`. Manual edits — `Read` + `Edit` / `Write` against the rendered HTML or the template — bypass the placeholder substitution and validation logic. If the script fails, surface the error and stop. Do not fall back to manual edits.
+
+Three sub-steps:
+
+**4a.** Use the `Write` tool to drop the firm's fund list to a JSON file inside the session's current working directory. Filename should be `<firm-slug>-funds.json`. Contents must be a JSON array of `{"uuid", "name", "currency"}` objects — all three keys required; `currency` is the fund's own code from Step 2, not a default. Add `"fund_family_name"` on any entry whose Step 2 `fund_family_name` was non-null, and `"vintage_date"` on any entry whose Step 2c `VINTAGE_DATE` was non-null — omit either key entirely (don't set it to `null`) when the fund doesn't have one:
+
+```json
+[
+  {"uuid": "<fund_uuid_1>", "name": "<fund_name_1>", "currency": "<currency_code_1>", "fund_family_name": "<family_name>", "vintage_date": "<YYYY-MM-DD>"},
+  {"uuid": "<fund_uuid_2>", "name": "<fund_name_2>", "currency": "<currency_code_2>", "fund_family_name": "<family_name>", "vintage_date": "<YYYY-MM-DD>"},
+  {"uuid": "<fund_uuid_3>", "name": "<fund_name_3>", "currency": "<currency_code_3>"}
+]
+```
+
+The fund list comes straight from Step 2's `fa:list:entities` response, enriched by Step 2c. Preserve the entity name verbatim — including apostrophes, ampersands, commas, and any punctuation. The script JSON-escapes hostile characters at substitution time.
+
+If any fund in the firm has a `fund_family_name`, the artifact automatically groups the fund dropdown by family: the family name is a bold, selectable row that pools every fund beneath it — same pooling behavior as "All Entities", including the "Held By" column — with its member funds indented under it. Families of one fund and standalone funds render as plain rows. No extra step or render argument is needed; this is driven entirely by whether `fund_family_name` is present in the funds file.
+
+The dropdown (and each family's members) sorts by `vintage_date` descending — most recent vintage first, undated funds last. This is the default for every firm, not just fund-of-funds ones; there's nothing to opt into.
+
+**4b.** Locate the script:
+
+The script is `${CLAUDE_PLUGIN_ROOT}/skills/carta-portfolio-analytics-routing/references/soi/scripts/render-artifact.py`. Bash reaches that path on every surface, Cowork included, so do not search for it.
+
+**4c.** Render. Run it on one line, exactly as written below. `allowed-tools` matches the command text, so a shell variable, a different path, or a line break fails the allowlist and the call has to be approved by hand each time:
+
+```bash
+uv run "${CLAUDE_PLUGIN_ROOT}/skills/carta-portfolio-analytics-routing/references/soi/scripts/render-artifact.py" "<CWD>/<firm-slug>-fund-soi-collection.html" "<firm-slug>-fund-soi-collection" "<CARTA_MCP_SERVER>" "<FIRM_UUID>" "<FIRM_NAME>" "<CWD>/<firm-slug>-funds.json" "<INITIAL_FUND_UUID>"
+```
+
+**The copy fallback.** Use it when `uv run` fails because the script file does not exist (not
+on a validation error). Bash could not reach the plugin mount, but `Read` can: copy both files
+into `<CWD>/soi-render/` as `scripts/render-artifact.py` and `references/artifact.html`, run
+that copy, and report that the fallback fired so the mount path gets fixed. One attempt — if
+it fails too, stop rather than hand-writing the HTML.
+
+Positional arguments:
+
+1. **Output path** — must be **absolute** and under the session's current working directory (`<CWD>`). Use `pwd` to resolve `<CWD>` if needed. Filename is `<firm-slug>-fund-soi-collection.html`.
+2. **Artifact ID** — the kebab-case slug that names this artifact. Must equal `<firm-slug>-fund-soi-collection`.
+3. **Carta connector display name** — `CARTA_MCP_SERVER` from Step 3.
+4. **Firm UUID** — the firm's UUID from Step 1. The artifact calls `set_context` with this on every load to pin the user's MCP firm context, so the dwh query succeeds even if the user switched contexts elsewhere.
+5. **Firm name** — the human-readable firm name from Step 1.
+6. **Funds file path** — the absolute path to the JSON file you wrote in 4a. Must also be under CWD.
+7. **Initial fund UUID** — the `initial_fund_uuid` chosen in Step 2. Must be one of the uuids in the funds file; the script refuses if it isn't.
+
+When Carta Home is building this page, it gives you its own URL. Add `--home-url "<carta_home_url>"` to the end of the same command line, so the page's "Back to Home" link points there. Without it the link stays hidden.
+
+On success, the script prints one stdout line: the absolute output path. The script exits non-zero on any validation failure (bad UUID, unusable connector name, output or funds file outside CWD, empty funds list, malformed fund entries, initial_fund_uuid not present in the list, template missing, missing placeholders). If it fails, surface the error and abort.
+
+**Slugification rules** (apply to the **firm name**, not any UUID):
+
+1. Lowercase
+2. Replace whitespace with hyphens
+3. Strip non-alphanumeric characters except hyphens
+4. Collapse consecutive hyphens
+5. Trim leading and trailing hyphens
+
+Example: `"Acme Capital Partners, L.P."` → slug `"acme-capital-partners-lp"` → output filename `acme-capital-partners-lp-fund-soi-collection.html`, funds-file `acme-capital-partners-lp-funds.json`, artifact id `acme-capital-partners-lp-fund-soi-collection`.
+
+Re-running the skill for the same firm produces the same artifact id and the same filename, so the artifact is cleanly updated in place by Step 5.
+
+### Step 5 — Publish the Live Artifact
+
+> **Critical: the render script only writes the HTML file. Nothing picks up file changes on its own — you MUST publish after every render, or the reader keeps seeing the prior version.**
+
+First find an existing one:
+
+```
+Artifact({action: "list", scope: "mine"})
+```
+
+If a **<Firm Name> — Schedule of Investments** artifact is already published, keep its `url`. Then publish — one call either way, `url` being the only difference:
+
+```
+Artifact({
+  file_path: "<absolute path printed by the render script>",
+  url: "<url from the list — omit entirely on a first publish>",
+  description: "<Firm Name> — fund Schedule of Investments",
+  favicon: "📈",
+  capabilities: {
+    mcp: {
+      servers: [
+        { server: "<CARTA_MCP_SERVER>", tools: ["call_tool", "set_context", "welcome", "fetch"] }
+      ]
+    }
+  }
+})
+```
+
+All four tools must be in the grant, or the page loads and the matching call rejects with `not_in_manifest`. `fetch` carries the update check, which asks carta-mcp for the published version and raises a banner when this page is behind it. The artifact only calls `welcome` itself when the MCP reports a "session not initialized" error on the first dwh query or set_context call — see **Session re-initialization** under Caveats.
+
+**No `title` here, and do not add one.** The tool reads the title out of the file's
+`<title>` tag and uses its `title` parameter only when the file has none, so a `title`
+passed alongside a rendered page is silently dropped. The render script stamps
+`<Firm Name> — Schedule of Investments` into the tag from the firm name you pass it. If the
+artifact comes out named wrong, the render is wrong — check what Step 1 resolved, not this
+call. The name is also the key a caller matches on to find this firm's existing page, so a
+page published under a bare title is invisible to that lookup and the next run publishes a
+second one.
+
+Keep `favicon` stable across redeploys, and restate the whole `capabilities` object every
+time: a non-empty object replaces the stored grant, so a tool left out is revoked.
+
+### Step 6 — Confirm to the user
+
+Pick the branch from the `name_status` value captured in Step 2.
+
+**`name_status == "named_and_found"`** — the user named a fund and we found it:
+
+> The Schedule of Investments for **<Fund Name>** is now loading in your Cowork sidebar. Use the **Fund** dropdown in the header to switch between any of the **<N>** funds in **<Firm Name>** you have access to.
+
+**`name_status == "named_but_missing"`** — the user named a fund we couldn't find; initial selection fell back to the firm-wide view:
+
+> I couldn't find a fund named **<named_term>** in **<Firm Name>**. I've loaded the Schedule of Investments artifact with the **<N>** funds you do have access to — use the **Fund** dropdown in the header to pick the one you meant.
+
+`<named_term>` is the value captured in Step 2.
+
+**`name_status == "unnamed"`** — the user asked for the firm's SOIs without naming a specific fund:
+
+> The Schedule of Investments artifact for **<Firm Name>** is now loading in your Cowork sidebar with all **<N>** funds you have access to. Use the **Fund** dropdown in the header to switch between them.
+
+**Churned funds (Step 2)** — if one of these applies, add its sentence straight after the branch sentence. `<N>` in every branch counts the funds actually in the dropdown, after churned ones were dropped.
+
+- `named_churned` — *"Carta no longer services **<Fund Name>**, so its figures are as of **<service_stop_date>** and won't update."* Write the date out, e.g. June 30, 2023.
+- `all_churned` — *"Carta no longer services any of **<Firm Name>**'s funds, so these figures won't update."*
+
+If both apply, use the `named_churned` sentence only. Say nothing when churned funds were simply left out — the user didn't ask about them.
+
+After the branch sentence, append a 3–5 bullet summary of what the artifact contains (e.g. interactive holdings table, Deal IRR columns — proceeds, total value, multiple and IRR — an Investment Cash Flows tab, summary metrics, sortable columns, expand/collapse rows, filter by company name, fund switcher across all funds you have access to). Keep it brief — the customer can see the artifact themselves. The bullet summary is optional on re-invocation branches; if you've already shown it earlier in the conversation, skip it.
+
+See **User-facing output** at the top of this skill for the broader narration rules.
+
+## Deal IRR columns
+
+The table ends with the columns of the app's Deal IRR view (a fund's Investments → Deal IRR tab). The artifact fetches and computes them itself, so nothing changes at build time. Know these when a user asks:
+
+- **Column order follows the app's Deal IRR view** for the money columns — cost, proceeds, fair market value, total value, gain/loss, multiple, IRR — with each SOI column beside its Deal IRR counterpart (Cost basis | Total cost, Unrealized G/L | Total G/L); Last updated and the per-share columns come last.
+- **Total cost, Proceeds, Total value, Total G/L** come from `FUND_ADMIN.AGGREGATE_INVESTMENTS` (`_HISTORY` for a past as-of date) and sum to the company and totals rows. Total cost is everything invested, including cost already realized; the **Cost basis** column is only the cost still held. Total value is proceeds + **Fair market value**. Total G/L is Total value − Total cost; **Unrealized G/L** stays unrealized only. (Cost basis, Fair market value and Unrealized G/L are the SOI's own columns, labelled to set them apart from the Deal IRR ones.)
+- **Multiple** is Total value ÷ Total cost at every level. The summary cards use the same definitions, so the **MOIC** card equals the totals-row Multiple.
+- **Gross IRR** (labelled as in the app) is gross deal IRR per fund × company from `FUND_ADMIN.TEMPORAL_DEAL_IRR`, which holds completed quarter-ends only. **Current** shows the latest quarter-end (named in the IRR header tooltip), so it can differ slightly from the app's live figure; a past as-of shows exactly that quarter-end. IRR is per company and fund, never per share class, so share-class rows never show it. A company one fund holds shows IRR on its company row. A company several funds hold leaves its row blank and, when expanded, shows one sub-row per fund — that fund's subtotals, multiple and IRR — with the fund's share-class rows beneath it. Look-through rows and the totals row leave it blank.
+- **Interest isn't shown.** The warehouse holds capitalized interest only, while the app's Interest also counts interest accrued since the last capitalization, so the two wouldn't match.
+- **Exited positions are hidden by default.** The **Show exited companies** button above the table (it then reads **Hide exited companies**) brings them back, tagged *Exited*, and the cards and totals follow it. The app's Deal IRR view includes them, so point a user at that button when a realized company seems missing.
+
+## Investment Cash Flows tab
+
+A tab strip above the table switches between **Holdings** (the default) and **Investment Cash Flows**, the second sheet of the app's Deal IRR export: one line per dated cash flow — Company / Account, Fund (multi-fund views only), Date, Amount. The artifact fetches it itself the first time the tab opens. Know these when a user asks:
+
+- **Lines.** Money invested is negative; proceeds and terminal value are positive. Each fund × company ends with a **Terminal value** line: the Holdings tab's Fair market value for the same positions, dated at the as-of date (today for Current). A realization lists each leg separately (return of cost, then gain), so proceeds often come in pairs, as in the app. A note converting with capitalized interest adds a *Capitalized interest* line and an offsetting *Interest income* line.
+- **Groups.** Rows group by company, and by fund within a company several funds hold. A group's amount is its net cash flow, which equals the company's Total G/L on the Holdings tab except where interest was capitalized (Total cost counts that interest; the flows show it as an offsetting pair) or cost was set in another currency. The app's own export differs from its Gain/Loss in the same places. The fund, As of and company search controls and the Show / Hide exited companies button apply to both tabs; exited companies keep their flows and end in a $0 terminal value.
+- **Source.** Flows are rebuilt from `FUND_ADMIN.JOURNAL_ENTRIES`, because the asset records the app uses aren't in the connector's tables. Amounts and dates match the app; the account wording uses the holding's name (e.g. *Investment - Limited partnership interest*) where the app names its share class (*Investment - Membership Interest*), and company names follow the Holdings tab.
+- **Large firms.** Results stop at 10,000 lines; past that the tab says the list was truncated. A failed load shows an error with Try again on the tab only.
+- **No export.** The tab has no Export to Excel; point a user at the app's Deal IRR Export for a spreadsheet.
+
+## Caveats
+
+- **The connector display name must match what the viewer has.** A published page runs for whoever opens it, and the grant names the connector by display name. If a viewer's Carta connector carries a different display name (a test connector, say), every call rejects with `server_not_connected`. Re-invoke this skill to republish against the right name.
+- **Session re-initialization.** The Carta MCP requires `welcome` to have been called once per session to populate identity/account state. When the user's session expires (typically after a few days of inactivity), the first `set_context` or dwh query returns an error string asking us to call `welcome` first. The artifact handles this transparently: it catches the error, briefly shows "Reconnecting to Carta…" above the shimmer, calls `welcome` itself, and retries the original call once.
+- **Cowork-only.** Live Artifacts only render in Cowork. If the user is in Claude Code or Claude Desktop, explain that the artifact view requires Cowork. For inline data answers, point them at the `carta-explore-data` skill.

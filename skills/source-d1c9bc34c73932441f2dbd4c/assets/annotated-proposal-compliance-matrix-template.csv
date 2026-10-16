@@ -1,0 +1,4 @@
+Req ID,Source ID,Source location,Requirement text,Requirement summary,Type,Priority,Outline location,Evidence needed,Owner,Status,Notes
+REQ-L-001,SRC-001,Section L.1 p.1,"","",instruction,mandatory,"","",Proposal Manager,unmapped,""
+REQ-M-001,SRC-001,Section M.1 p.1,"","",evaluation,evaluated,"","",Proposal Manager,unmapped,""
+REQ-C-001,SRC-002,PWS Section 1 p.1,"","",work,contractual,"","",Technical Lead,unmapped,""

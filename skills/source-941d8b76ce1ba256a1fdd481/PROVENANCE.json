@@ -1,0 +1,6 @@
+{
+  "repository": "robertguss/claude-skills",
+  "ref": "default",
+  "path": "plugins/compound-writing/skills/pragmatic-writing/SKILL.md",
+  "source": "https://github.com/robertguss/claude-skills"
+}

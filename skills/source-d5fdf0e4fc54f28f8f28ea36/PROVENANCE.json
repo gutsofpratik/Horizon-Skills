@@ -1,0 +1,6 @@
+{
+  "repository": "google/agents-cli",
+  "ref": "main",
+  "path": "skills/google-agents-cli-deploy/SKILL.md",
+  "source": "https://github.com/google/agents-cli/tree/main/skills/google-agents-cli-deploy"
+}

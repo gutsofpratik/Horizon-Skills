@@ -1,0 +1,445 @@
+#!/usr/bin/env python3
+"""
+Google Search Console Search Analytics query helper.
+
+Queries the GSC Search Analytics API for clicks, impressions, CTR, and position
+data. Supports filtering by dimensions, auto-pagination, and quick-win detection.
+
+Usage:
+    python gsc_query.py --property sc-domain:example.com
+    python gsc_query.py --property sc-domain:example.com --days 90 --dimensions query
+    python gsc_query.py sitemaps --property sc-domain:example.com
+    python gsc_query.py sites
+"""
+
+import argparse
+import json
+import sys
+from datetime import date, datetime, timedelta
+from typing import Optional
+
+try:
+    from google_auth import (
+        describe_google_api_error, execute_with_retries, get_oauth_credentials,
+        load_config, safe_exception_text, setup_hint,
+    )
+except ImportError:
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from google_auth import (
+        describe_google_api_error, execute_with_retries, get_oauth_credentials,
+        load_config, safe_exception_text, setup_hint,
+    )
+
+try:
+    from googleapiclient.discovery import build
+except ImportError:
+    print(f"Error: google-api-python-client required. {setup_hint()}", file=sys.stderr)
+    sys.exit(1)
+
+GSC_SCOPES = ["https://www.googleapis.com/auth/webmasters.readonly"]
+DATA_LAG_DAYS = 3
+DEFAULT_DAYS = 28
+MAX_PAGE_SIZE = 25000
+
+
+def default_date_range(days: int = DEFAULT_DAYS, today: Optional[date] = None) -> tuple:
+    """Return (start, end) as YYYY-MM-DD strings for a window of exactly `days` days.
+
+    The window ends DATA_LAG_DAYS days before today (Search Console data lag) and
+    is inclusive at both ends, so the default is the 28 days ending 3 days ago.
+    The start never falls after the end, for any days >= 1.
+    """
+    if days < 1:
+        raise ValueError("days must be at least 1")
+    end = (today or datetime.now().date()) - timedelta(days=DATA_LAG_DAYS)
+    start = end - timedelta(days=days - 1)
+    return start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d")
+
+
+def _build_gsc_service():
+    """Build the Search Console API service."""
+    credentials = get_oauth_credentials(GSC_SCOPES)
+    if not credentials:
+        return None
+    try:
+        return build("searchconsole", "v1", credentials=credentials)
+    except Exception as e:
+        print(f"Error building GSC service: {safe_exception_text(e)}", file=sys.stderr)
+        return None
+
+
+def query_search_analytics(
+    site_url: str,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    dimensions: Optional[list] = None,
+    search_type: str = "web",
+    row_limit: int = 1000,
+    filters: Optional[list] = None,
+    data_state: str = "final",
+) -> dict:
+    """
+    Query GSC Search Analytics API.
+
+    Args:
+        site_url: GSC property (e.g., 'sc-domain:example.com' or 'https://example.com/').
+        start_date: Start date (YYYY-MM-DD). Default: 27 days before end_date
+            (a 28-day window ending 3 days ago, inclusive).
+        end_date: End date (YYYY-MM-DD). Default: 3 days ago (data lag).
+        dimensions: List of dimensions: query, page, country, device, date, searchAppearance.
+        search_type: web, image, video, news, discover, googleNews.
+        row_limit: Rows per page, 1-25000 (values above 25000 are clamped, below
+            1 are rejected). Auto-paginates until a short page or 100,000 rows.
+        filters: List of filter dicts with dimension, operator, expression.
+        data_state: 'final', 'all', or 'hourly_all'. hourly_all requires hour dimension.
+
+    Returns:
+        Dictionary with rows, totals, and quick_wins.
+    """
+    result = {
+        "property": site_url,
+        "rows": [],
+        "totals": {"clicks": 0, "impressions": 0, "ctr": 0, "position": 0},
+        "quick_wins": [],
+        "row_count": 0,
+        "error": None,
+    }
+
+    if not isinstance(row_limit, int) or isinstance(row_limit, bool) or row_limit < 1:
+        # A page size of 0 would never advance the pagination offset.
+        result["error"] = "row_limit must be an integer of at least 1."
+        return result
+
+    service = _build_gsc_service()
+    if not service:
+        result["error"] = "Could not build GSC service. Check service account credentials."
+        return result
+
+    if not end_date:
+        end_date = default_date_range(1)[1]
+    if not start_date:
+        end_day = datetime.strptime(end_date, "%Y-%m-%d").date()
+        start_date = (end_day - timedelta(days=DEFAULT_DAYS - 1)).strftime("%Y-%m-%d")
+    if start_date > end_date:
+        result["error"] = f"start_date {start_date} is after end_date {end_date}."
+        return result
+    if dimensions is None:
+        dimensions = ["query", "page"]
+    dims_lower = {d.lower() for d in dimensions}
+    if data_state == "hourly_all" and "hour" not in dims_lower:
+        result["error"] = "data_state=hourly_all requires the hour dimension."
+        return result
+
+    result["date_range"] = {"start": start_date, "end": end_date}
+
+    body = {
+        "startDate": start_date,
+        "endDate": end_date,
+        "dimensions": dimensions,
+        "type": search_type,
+        "rowLimit": min(row_limit, MAX_PAGE_SIZE),
+        "dataState": data_state,
+    }
+
+    if filters:
+        body["dimensionFilterGroups"] = [{"filters": filters}]
+
+    # Auto-paginate
+    all_rows = []
+    start_row = 0
+    page_size = min(row_limit, MAX_PAGE_SIZE)
+
+    try:
+        while True:
+            body["startRow"] = start_row
+            body["rowLimit"] = page_size
+
+            response = execute_with_retries(service.searchanalytics().query(
+                siteUrl=site_url, body=body
+            ))
+
+            rows = response.get("rows", [])
+            all_rows.extend(rows)
+
+            if len(rows) < page_size:
+                break
+
+            start_row += page_size
+
+            # Safety: cap at 100,000 rows
+            if start_row >= 100000:
+                break
+
+    except Exception as e:
+        status = getattr(getattr(e, "resp", None), "status", None)
+        if isinstance(status, str) and status.isdigit():
+            status = int(status)
+        if status == 403:
+            result["error"] = describe_google_api_error(
+                e, 'Search Console', 'Add the service account as a user in Google Search Console > Settings > Users and permissions for this property.'
+            )
+        elif status == 404:
+            result["error"] = (
+                f"Property '{site_url}' not found. "
+                "Use 'sc-domain:example.com' for domain properties or "
+                "'https://example.com/' for URL-prefix properties."
+            )
+        else:
+            result["error"] = describe_google_api_error(e, 'Search Console')
+        return result
+
+    # Process rows
+    total_clicks = 0
+    total_impressions = 0
+
+    for row in all_rows:
+        keys = row.get("keys", [])
+        clicks = row.get("clicks", 0)
+        impressions = row.get("impressions", 0)
+        ctr = row.get("ctr", 0)
+        position = row.get("position", 0)
+
+        processed = {
+            "keys": keys,
+            "clicks": clicks,
+            "impressions": impressions,
+            "ctr": round(ctr * 100, 2),
+            "position": round(position, 1),
+        }
+
+        # Label keys by dimension name
+        for i, dim in enumerate(dimensions):
+            if i < len(keys):
+                processed[dim] = keys[i]
+
+        result["rows"].append(processed)
+        total_clicks += clicks
+        total_impressions += impressions
+
+    result["row_count"] = len(all_rows)
+    result["totals"]["clicks"] = total_clicks
+    result["totals"]["impressions"] = total_impressions
+    if total_impressions > 0:
+        result["totals"]["ctr"] = round((total_clicks / total_impressions) * 100, 2)
+
+    # Quick wins: position 4-10 with high impressions
+    if "query" in dimensions:
+        sorted_by_impressions = sorted(all_rows, key=lambda r: r.get("impressions", 0), reverse=True)
+        for row in sorted_by_impressions[:200]:
+            pos = row.get("position", 0)
+            if 4 <= pos <= 10 and row.get("impressions", 0) > 50:
+                result["quick_wins"].append({
+                    "keys": row.get("keys", []),
+                    "position": round(pos, 1),
+                    "impressions": row.get("impressions", 0),
+                    "clicks": row.get("clicks", 0),
+                    "ctr": round(row.get("ctr", 0) * 100, 2),
+                    "opportunity": "Position 4-10 with high impressions - small ranking improvement yields significant traffic gain",
+                })
+
+        result["quick_wins"] = result["quick_wins"][:20]
+
+    return result
+
+
+def list_sitemaps(site_url: str) -> dict:
+    """
+    List sitemaps for a GSC property.
+
+    Args:
+        site_url: GSC property URL.
+
+    Returns:
+        Dictionary with sitemaps list.
+    """
+    result = {"property": site_url, "sitemaps": [], "error": None}
+
+    service = _build_gsc_service()
+    if not service:
+        result["error"] = "Could not build GSC service."
+        return result
+
+    try:
+        response = execute_with_retries(service.sitemaps().list(siteUrl=site_url))
+        for sm in response.get("sitemap", []):
+            result["sitemaps"].append({
+                "path": sm.get("path"),
+                "last_submitted": sm.get("lastSubmitted"),
+                "is_pending": sm.get("isPending"),
+                "is_index": sm.get("isSitemapsIndex"),
+                "type": sm.get("type"),
+                "warnings": sm.get("warnings", 0),
+                "errors": sm.get("errors", 0),
+                "contents": sm.get("contents", []),
+            })
+    except Exception as e:
+        result["error"] = f"Error listing sitemaps: {describe_google_api_error(e, 'Search Console')}"
+
+    return result
+
+
+def list_sites() -> dict:
+    """
+    List all verified GSC properties.
+
+    Returns:
+        Dictionary with sites list.
+    """
+    result = {"sites": [], "error": None}
+
+    service = _build_gsc_service()
+    if not service:
+        result["error"] = "Could not build GSC service."
+        return result
+
+    try:
+        response = execute_with_retries(service.sites().list())
+        for site in response.get("siteEntry", []):
+            result["sites"].append({
+                "url": site.get("siteUrl"),
+                "permission": site.get("permissionLevel"),
+            })
+    except Exception as e:
+        result["error"] = f"Error listing sites: {describe_google_api_error(e, 'Search Console')}"
+
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Google Search Console Search Analytics query helper"
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        default="query",
+        choices=["query", "sitemaps", "sites"],
+        help="Command: query (default), sitemaps, sites",
+    )
+    parser.add_argument(
+        "--property", "-p",
+        help="GSC property (e.g., sc-domain:example.com). Uses default from config if not specified.",
+    )
+    parser.add_argument(
+        "--days", "-d", type=int, default=DEFAULT_DAYS,
+        help=(
+            f"Window length in days, inclusive, ending {DATA_LAG_DAYS} days ago because of "
+            f"Search Console data lag (default: {DEFAULT_DAYS}, so the last 28 days up to 3 days ago)"
+        ),
+    )
+    parser.add_argument("--start-date", help="Start date (YYYY-MM-DD)")
+    parser.add_argument("--end-date", help="End date (YYYY-MM-DD)")
+    parser.add_argument(
+        "--dimensions",
+        default="query,page",
+        help="Comma-separated dimensions (default: query,page)",
+    )
+    parser.add_argument("--type", default="web", help="Search type (default: web)")
+    parser.add_argument(
+        "--limit", type=int, default=1000,
+        help=f"Rows per page, 1-{MAX_PAGE_SIZE} (default: 1000); pagination continues automatically",
+    )
+    parser.add_argument(
+        "--data-state",
+        choices=["final", "all", "hourly_all"],
+        default="final",
+        help="Search Analytics data state (default: final)",
+    )
+    parser.add_argument(
+        "--device",
+        choices=["desktop", "mobile", "tablet"],
+        help="Filter by device type",
+    )
+    parser.add_argument("--country", help="Filter by country (ISO 3166-1 alpha-3, e.g., USA)")
+    parser.add_argument("--json", "-j", action="store_true", help="Output as JSON")
+
+    args = parser.parse_args()
+    if args.limit < 1:
+        parser.error("--limit must be at least 1")
+    if args.days < 1:
+        parser.error("--days must be at least 1")
+    for flag, value in (("--start-date", args.start_date), ("--end-date", args.end_date)):
+        if value:
+            try:
+                datetime.strptime(value, "%Y-%m-%d")
+            except ValueError:
+                parser.error(f"{flag} must use YYYY-MM-DD")
+
+    # Resolve property
+    prop = args.property
+    if not prop:
+        config = load_config()
+        prop = config.get("default_property")
+    if not prop and args.command != "sites":
+        print("Error: No property specified. Use --property or set default_property in config.", file=sys.stderr)
+        sys.exit(1)
+
+    if args.command == "sites":
+        result = list_sites()
+    elif args.command == "sitemaps":
+        result = list_sitemaps(prop)
+    else:
+        default_start, default_end = default_date_range(args.days)
+        end = args.end_date or default_end
+        if args.start_date:
+            start = args.start_date
+        elif args.end_date:
+            end_day = datetime.strptime(args.end_date, "%Y-%m-%d").date()
+            start = (end_day - timedelta(days=args.days - 1)).strftime("%Y-%m-%d")
+        else:
+            start = default_start
+        dims = [d.strip() for d in args.dimensions.split(",")]
+        filters = []
+        if args.device:
+            filters.append({
+                "dimension": "device",
+                "operator": "equals",
+                "expression": args.device.upper(),
+            })
+        if args.country:
+            filters.append({
+                "dimension": "country",
+                "operator": "equals",
+                "expression": args.country.upper(),
+            })
+        result = query_search_analytics(
+            prop, start_date=start, end_date=end,
+            dimensions=dims, search_type=args.type, row_limit=args.limit,
+            filters=filters if filters else None,
+            data_state=args.data_state,
+        )
+
+    if result.get("error"):
+        print(f"Error: {result['error']}", file=sys.stderr)
+        if not args.json:
+            sys.exit(1)
+
+    if args.json:
+        print(json.dumps(result, indent=2))
+    else:
+        if args.command == "sites":
+            print("=== Verified GSC Properties ===")
+            for site in result.get("sites", []):
+                print(f"  {site['url']} ({site['permission']})")
+        elif args.command == "sitemaps":
+            print(f"=== Sitemaps for {prop} ===")
+            for sm in result.get("sitemaps", []):
+                status = "pending" if sm.get("is_pending") else "processed"
+                print(f"  {sm['path']} [{status}] errors={sm.get('errors', 0)} warnings={sm.get('warnings', 0)}")
+        else:
+            totals = result.get("totals", {})
+            print(f"=== Search Analytics: {prop} ===")
+            print(f"Period: {result.get('date_range', {}).get('start')} to {result.get('date_range', {}).get('end')}")
+            print(f"Clicks: {totals.get('clicks', 0):,} | Impressions: {totals.get('impressions', 0):,} | CTR: {totals.get('ctr', 0)}% | Rows: {result.get('row_count', 0)}")
+
+            qw = result.get("quick_wins", [])
+            if qw:
+                print(f"\nQuick Wins ({len(qw)} found):")
+                for w in qw[:10]:
+                    keys = " | ".join(w.get("keys", []))
+                    print(f"  Pos {w['position']} | {w['impressions']:,} imp | {w['clicks']} clicks | {keys}")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,19 @@
+{
+  "criteria": [
+    {
+      "id": "PROJECT.validation_isolation",
+      "result": "pass",
+      "evidence": ["Example fixture review: greet.cjs only writes to stdout; validation runs two local Node invocations in the supplied workspace and does not write controller metadata."]
+    },
+    {
+      "id": "TASK.greeting",
+      "result": "pass",
+      "evidence": ["Example fixture: node greet.cjs Ada exits 0 with stdout Hello, Ada! followed by one newline."]
+    },
+    {
+      "id": "TASK.invalid_input",
+      "result": "fail",
+      "evidence": ["Example fixture: node greet.cjs exits 0 and prints Hello, undefined! to stdout, rather than emitting a stderr diagnostic and exiting nonzero."]
+    }
+  ]
+}

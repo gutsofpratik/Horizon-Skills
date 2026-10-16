@@ -1,0 +1,223 @@
+name: Security Checks
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# Default to least privilege. Each job re-grants only what it needs.
+permissions: {}
+
+# Cancel in-flight runs for the same ref to save CI time and cost.
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------
+  # 0. Skill integrity - corpus structure and routing safety
+  # ---------------------------------------------------------------
+  skill-integrity:
+    name: Skill Integrity
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Lint skill corpus
+        run: python3 scripts/lint-skill.py
+
+  # ---------------------------------------------------------------
+  # 1. Secret scanning - blocks hardcoded credentials
+  # ---------------------------------------------------------------
+  gitleaks:
+    name: Secret Scanning (Gitleaks)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------
+  # 2. Static analysis - dangerous code patterns (SAST)
+  # ---------------------------------------------------------------
+  semgrep:
+    name: SAST (Semgrep)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: semgrep/semgrep:1.159.0
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Semgrep local AI/vibecoder rules
+        run: semgrep scan --config semgrep/ --error --metrics=off --exclude evals/fixtures
+      - name: Semgrep auto rules (informational)
+        run: semgrep scan --config=auto --metrics=off --exclude evals/fixtures || true
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+  # ---------------------------------------------------------------
+  # 2b. Secure-review smoke - agent entrypoint on known-bad fixtures
+  # ---------------------------------------------------------------
+  secure-review-smoke:
+    name: Secure Review Smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: semgrep/semgrep:1.159.0
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Compile review scripts
+        run: python3 -m py_compile scripts/secure-review.py scripts/map_findings.py scripts/rescan-after-fix.py evals/scale/run_scale.py
+      - name: Run secure-review on vulnerable fixtures
+        run: |
+          set +e
+          python3 scripts/secure-review.py evals/fixtures/vulnerable-snippet --mode propose --skip-gitleaks -o /tmp/secure-review.json
+          status=$?
+          set -e
+          python3 - <<'PY'
+          import json, sys
+          report = json.load(open("/tmp/secure-review.json", encoding="utf-8"))
+          errors = report.get("summary", {}).get("error", 0)
+          tools = report.get("tools", {})
+          semgrep = tools.get("semgrep", {})
+          blast = report.get("blast_summary", {})
+          safety = report.get("safety", {})
+          policy = report.get("agent_policy", {})
+          if report.get("mode") != "propose":
+              print("expected mode=propose", file=sys.stderr)
+              sys.exit(1)
+          if not semgrep.get("available"):
+              print("semgrep unavailable in smoke container", file=sys.stderr)
+              sys.exit(1)
+          if errors < 1:
+              print("expected ERROR findings in vulnerable fixtures", file=sys.stderr)
+              print(json.dumps(report, indent=2), file=sys.stderr)
+              sys.exit(1)
+          if blast.get("db", 0) < 1:
+              print("expected at least one db blast_radius finding", file=sys.stderr)
+              sys.exit(1)
+          if safety.get("touches_production_db") is not False:
+              print("safety.touches_production_db must be false", file=sys.stderr)
+              sys.exit(1)
+          if policy.get("may_edit_files") is not False:
+              print("propose mode must set may_edit_files=false", file=sys.stderr)
+              sys.exit(1)
+          for finding in report.get("findings", []):
+              if finding.get("blast_radius") in {"db", "secrets"} and finding.get("safe_to_autofix"):
+                  print("db/secrets must not be safe_to_autofix", finding, file=sys.stderr)
+                  sys.exit(1)
+          if not report.get("proposed_fixes"):
+              print("propose mode must include proposed_fixes", file=sys.stderr)
+              sys.exit(1)
+          print(f"smoke ok: {errors} ERROR finding(s); blast={blast}")
+          PY
+          if [ "$status" -ne 1 ]; then
+            echo "expected exit code 1 from secure-review when findings exist, got $status"
+            exit 1
+          fi
+      - name: Scale harness (small corpus)
+        run: python3 evals/scale/run_scale.py --variants 3 --min-f1 0.95
+
+  # ---------------------------------------------------------------
+  # 3. Dependency vulnerability scan
+  # ---------------------------------------------------------------
+  trivy-deps:
+    name: Dependency Scan (Trivy)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Run Trivy on filesystem
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          format: table
+          ignore-unfixed: true
+
+  # ---------------------------------------------------------------
+  # 4. Container image scan (uncomment when a Dockerfile is present)
+  # ---------------------------------------------------------------
+  # trivy-image:
+  #   name: Container Scan (Trivy)
+  #   runs-on: ubuntu-latest
+  #   permissions:
+  #     contents: read
+  #   steps:
+  #     - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+  #       with:
+  #         persist-credentials: false
+  #     - name: Build image
+  #       run: docker build -t app:${{ github.sha }} .
+  #     - name: Scan image
+  #       uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+  #       with:
+  #         image-ref: app:${{ github.sha }}
+  #         severity: CRITICAL,HIGH
+  #         exit-code: '1'
+
+  # ---------------------------------------------------------------
+  # 5. SBOM generation (uploaded as artifact)
+  # ---------------------------------------------------------------
+  sbom:
+    name: Generate SBOM (Syft)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          format: spdx-json
+          output-file: sbom.spdx.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sbom
+          path: sbom.spdx.json
+          retention-days: 30
+
+  # ---------------------------------------------------------------
+  # 6. Dependency review - block PRs introducing known-vulnerable deps
+  # Soft-fail when Dependency graph is unavailable on the repository.
+  # ---------------------------------------------------------------
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+          # Avoid PR comment failures when the token lacks pull-requests write
+          # or Dependency graph is disabled on the repository.
+          comment-summary-in-pr: never

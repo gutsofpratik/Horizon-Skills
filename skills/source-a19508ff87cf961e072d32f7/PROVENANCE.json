@@ -1,0 +1,6 @@
+{
+  "repository": "monte-carlo-data/mc-agent-toolkit",
+  "ref": "default",
+  "path": ".claude/skills/toolkit-skill-author/SKILL.md",
+  "source": "https://github.com/monte-carlo-data/mc-agent-toolkit"
+}

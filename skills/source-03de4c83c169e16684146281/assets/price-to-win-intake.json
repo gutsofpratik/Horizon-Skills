@@ -1,0 +1,11 @@
+{
+  "opportunity_identifier": "GovTribe URL, solicitation number, notice ID, award ID, or title",
+  "customer_company": "Optional if supplied by MCP or user context; ask only when it materially changes the decision",
+  "proposed_total_price": "Optional",
+  "proposed_labor_rates_or_pricing_sheet": "Optional",
+  "target_margin_or_fee": "Optional",
+  "contract_vehicles_available": "Optional",
+  "differentiators": "Optional technical/past performance advantages",
+  "known_competitors": "Optional",
+  "desired_depth": "quick_check | standard_brief | deep_analysis"
+}

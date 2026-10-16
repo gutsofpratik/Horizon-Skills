@@ -1,0 +1,7 @@
+name: Example CLI project standard
+version: "1"
+assumptions:
+  - Validation is local; production execution and publication are outside this exercise.
+criteria:
+  - id: PROJECT.validation_isolation
+    pass_when: Validation creates or changes files only inside the supplied workspace or newly created temporary directories; it never mutates real controller metadata.

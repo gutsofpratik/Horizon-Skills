@@ -1,0 +1,6 @@
+{
+  "repository": "anthropics/claude-plugins-official",
+  "ref": "main",
+  "path": "plugins/claude-md-management/skills/claude-md-improver/SKILL.md",
+  "source": "https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-md-management"
+}

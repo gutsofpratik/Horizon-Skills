@@ -1,0 +1,6 @@
+{
+  "repository": "anthropics/claude-plugins-official",
+  "ref": "main",
+  "path": "plugins/cwc-makers/skills/m5-onboard/SKILL.md",
+  "source": "https://github.com/anthropics/claude-plugins-official/tree/main/plugins/cwc-makers"
+}

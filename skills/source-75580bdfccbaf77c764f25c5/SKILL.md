@@ -1,0 +1,316 @@
+---
+name: development-workflow
+description: Orchestrates the complete Falcon Foundry app lifecycle from requirements through deployment. TRIGGER when user asks to "create a Foundry app", "build a Foundry app", "plan a Foundry app", runs any `foundry apps` CLI command, or discusses Foundry app architecture. DO NOT TRIGGER when user is working on a specific capability (UI, function, workflow, collection) within an existing app — use the appropriate sub-skill instead. This skill OWNS the entire Foundry development flow. Do not delegate Foundry app creation to superpowers:brainstorming or superpowers:writing-plans — those skills do not know about the Foundry CLI.
+version: 1.6.0
+updated: 2026-10-01
+tags: [foundry, lifecycle, cli, deployment]
+author: CrowdStrike
+license: MIT
+compatibility: Claude Code >=1.0
+metadata:
+  category: orchestration
+---
+
+# Foundry Development Workflow
+
+> This skill owns the Foundry development flow. Follow the **App Creation Flow** below from user prompt to running app, scaffold with `foundry apps create` and related CLI commands, delegate capability-specific content to the Foundry sub-skills, and hand-write only what the CLI can't generate (OpenAPI content, workflow logic, UI code).
+>
+> Don't hand Foundry app creation to superpowers:brainstorming or superpowers:writing-plans. They don't know the Foundry CLI and produce plans that hand-write manifest.yml and boilerplate files. They can supplement this flow (TDD discipline, code review), not replace it.
+>
+> **CRITICAL: add `--no-prompt` to every command that accepts it** — without it, interactive prompts cause `Error: EOF`. The `create`, `validate`, `deploy`, `release`, and `delete` commands all accept it (`apps delete` also needs `--force-delete`). Three reject it and fail with `unknown flag`: `foundry version`, `apps list`, and `apps list-deployments`. Verify with `foundry <command> --help`. When a command fails, MUST NOT fall back to `mkdir` — fix the command and retry.
+>
+> **CRITICAL: All `foundry` app commands MUST run from the app root directory** (where `manifest.yml` lives). The CLI resolves manifest paths relative to `os.Getwd()`, not relative to the manifest's location. Running `foundry apps validate`, `foundry apps deploy`, or `foundry ui run` from a subdirectory (e.g., `ui/extensions/my-ext/`) causes doubled paths and misleading "file not found" errors. After `cd`-ing into a subdirectory for `npm install && npm run build`, always `cd` back to the app root before running any `foundry apps *` or `foundry ui *` command. Commands that work from anywhere: `foundry version`, `foundry profile *`, `foundry apps list`.
+
+This skill coordinates the full Falcon Foundry app lifecycle — from parsing requirements through scaffolding, implementation, and deployment. It delegates capability-specific work to sub-skills that know the platform details.
+
+## Decision Tree
+
+```
+What does the user need?
+
+Create a new Foundry app
+└── Follow the App Creation Flow below
+
+Add a capability to an existing app
+├── API integration       → api-integrations
+├── Workflow              → workflows-development
+├── UI page/extension     → ui-development
+├── Function              → functions-development
+├── Collection            → collections-development
+├── AI agent / knowledge base → ai-agents-development
+└── Falcon API from funcs → functions-falcon-api
+
+Execute / test a deployed function
+├── "run my function", "execute function"     → functions-development
+├── "check execution status", "exec status"   → functions-development
+├── "get function logs", "show logs"          → functions-development
+├── "list executions"                         → functions-development
+├── "test my function" (function tests.yml)   → functions-development
+└── "run tests", "test cases"                 → functions-development
+
+Debug a function failure
+├── "debug my function", "why did it fail"    → debugging-workflows
+├── "function returning errors"               → debugging-workflows
+└── "no logs available"                       → debugging-workflows
+
+Implement a known pattern (pagination, enrichment, ingestion, etc.)
+└── Search use-cases/*.md for matching pattern → load for context
+
+Debug / troubleshoot      → debugging-workflows
+Security review           → security-patterns
+E2E testing / Playwright  → e2e-testing
+
+Standalone Fusion workflow (no app — trigger + existing actions only)
+└── fusion-redirect (declines and points to the Falcon Fusion plugin)
+```
+
+### Routing When Sub-Skills Are Not Registered
+
+Sub-skills live beside this one as `../<name>/SKILL.md`. On a single-entry-point install only this skill is discoverable, so capability-level requests land here — that is intended, not a mis-route. Read the sub-skill file from disk before writing any capability content, then:
+
+- **`manifest.yml` already present** — skip Steps 1-2 and Step 4. Run the Step 3 prerequisite check, add the capability with its Step 5 CLI command, and follow Manifest Coordination.
+- **No app yet** — run the full App Creation Flow.
+
+This never overrides the fusion-redirect skill: a standalone Fusion workflow request is still a redirect, not a capability to add.
+
+
+## App Creation Flow
+
+### Step 1: Parse Requirements
+
+Map user requests to Foundry capabilities:
+
+| User Says | Capability | CLI Command |
+|-----------|-----------|-------------|
+| "API integration", "connect to X API" | API Integration | `foundry api-integrations create` |
+| "workflow", "on-demand", "automate" | Workflow | `foundry workflows create` |
+| "UI", "page", "dashboard" | UI Page | `foundry ui pages create` |
+| "extension", "sidebar", "widget" | UI Extension | `foundry ui extensions create` |
+| "function", "serverless", "backend" | Function | `foundry functions create` |
+| "store data", "collection", "database" | Collection | `foundry collections create` |
+| "AI agent", "Charlotte agent", "agentic" | AI Agent | `foundry agents create` |
+| "knowledge base", "give the agent docs" | Knowledge Base | `foundry knowledge-bases create` |
+| "run function", "execute", "test handler" | Function Execution | `foundry functions exec` |
+| "get logs", "show execution logs" | Log Retrieval | `foundry functions logs` |
+| "check status", "execution result" | Execution Status | `foundry functions exec status` |
+| "test function", "run tests", "test cases" | Function Testing | `foundry functions test` |
+| "debug function", "why did it fail" | Function Debugging | → debugging-workflows skill |
+
+> **⚠️ "Summarize/list alerts, detections, or incidents" (a population the workflow doesn't already have) implies a source-of-truth fetch.** A request like "a workflow that emails a summary of high-severity alerts" needs the *set* of alerts, which is not reliably in NG-SIEM (Event Query can silently return nothing — repo contents are connector-dependent). Fetch it from the source of truth: a native platform action (e.g. Cases → Search Cases) first, or a FalconPy `Alerts`/`Detects` function when none fits — so the app needs BOTH that capability (plan the `alerts:read` scope) AND a workflow to schedule it and send email. **Exception:** *enriching* a detection the workflow was already triggered on (query by its ID) stays an Event Query and needs no function. See the `functions-falcon-api` skill and the `workflows-development` skill's `references/event-query-vs-api.md`.
+
+### Step 1b: Check for Known Patterns
+
+Before scaffolding, check if the user's request matches a known use case. Glob `use-cases/*.md` and scan the `description` field in each file's frontmatter. If a match is found, read the use case file for implementation context (architecture, capability order, gotchas) before proceeding.
+
+Use cases cover common scenarios like API pagination, detection enrichment, lookup table creation, LogScale data ingestion, SOAR custom actions, and more. See `use-cases/README.md` for the full catalog.
+
+### Step 2: Confirm App Name and Capabilities
+
+**Always confirm the app name with the user before creating anything.** Use the assistant's available user-input mechanism; if none exists, ask directly in chat. Derive a reasonable default from the user's request (e.g., "okta-integration" for an Okta API integration), then present it as the recommended option with 1-2 alternatives. Include a brief description of what will be created.
+
+**Page vs Extension disambiguation:** When the user mentions "UI" without specifying "page" or "extension", ask which they want using the available user-input mechanism. Offer two options: "Page" (standalone full-page view — dashboards, lists, management UIs) and "Extension" (sidebar widget embedded in detection/host/incident pages). Default to Page when running non-interactively (e.g., agent batch mode or test automation) since pages are the more common case.
+
+For other decisions, prefer reasonable defaults: use React for UI, download public OpenAPI specs from vendor GitHub repos. Only ask additional clarifying questions when the prompt is genuinely ambiguous and a wrong guess would produce an unusable app.
+
+### Step 3: CLI Prerequisite Check
+
+```bash
+foundry version          # Verify CLI installed
+foundry profile active   # Verify authentication
+foundry apps list        # Check existing apps (avoid name collisions)
+```
+
+If a tenant command fails with only `connection issue`, the usual cause is a
+sandbox denying the CLI's token-cache write to `~/.config/foundry/` — an
+expected refresh, not a network fault. Request write access to that directory
+and retry; see
+[headless operation](references/headless-operation.md). Never redirect the
+config path into the workspace or copy credentials.
+
+### Step 4: Scaffold the App
+
+**Prerequisite:** User must have confirmed the app name in Step 2. Do not run this without confirmation.
+
+Choose the location automatically: use an existing app when `manifest.yml` is
+present; otherwise create in the current directory, or beside it when the
+current directory is an unrelated repository. Request sandbox write access when
+needed; never put the app inside an unrelated repository as a fallback.
+
+```bash
+foundry apps create --name "app-name" --description "description" --no-prompt --no-git
+cd app-name
+```
+
+`--no-prompt` prevents interactive prompts that fail in non-interactive environments with `Error: EOF`. `--no-git` skips git initialization. The command is `foundry apps create` (there is no `init` command). If it fails, fix the command and retry — MUST NOT fall back to `mkdir`, which produces invalid manifest structure.
+
+`foundry apps create` always makes a **subdirectory named after the app** (spaces included). When converting an existing repo, run `create` beside it and move the freshly generated `manifest.yml` to the repo root rather than leaving a nested app directory.
+
+### Step 5: Add Capabilities (CLI Commands)
+
+Run in dependency order. Write spec/schema files to `/tmp/` — the CLI copies them into the project and updates `manifest.yml` with generated IDs.
+
+```bash
+# 1. API integrations — delegate spec work to api-integrations sub-skill
+#    IMPORTANT: Download specs inline with gh/curl. Do NOT spawn Explore agents for spec download.
+foundry api-integrations create --name "MyApi" --description "desc" --spec /tmp/MyApi.yaml --no-prompt
+
+# 2. Collections (names: letters, numbers, underscores ONLY)
+foundry collections create --name "my_col" --schema /tmp/my_schema.json --description "desc" --no-prompt
+
+# 3. VALIDATE EARLY — fail fast if specs or schemas are bad
+foundry apps validate --no-prompt
+# If validation fails, STOP. Fix the spec/schema — do not build UI on a broken backend.
+# The adapt script handles known spec issues. If one remains, patch only that spot and tell the user what the script missed.
+
+# 4. Functions
+foundry functions create --name "my-fn" --language python --description "desc" \
+  --handler-name process --handler-method POST --handler-path /api/process --no-prompt
+
+# 5. Workflows — MUST load workflows-development sub-skill before writing the spec file
+foundry workflows create --name "My Workflow" --spec /tmp/My_workflow.yml --no-prompt
+
+# 5b. Knowledge bases BEFORE agents — the agent create command validates KB refs.
+#     --files is required with --no-prompt (accepts local paths or HTTP(S) URLs).
+foundry knowledge-bases create --name "Runbook Docs" --description "desc" \
+  --files /tmp/runbook.md --no-prompt
+
+# 5c. AI agents — reference KBs by NAME. Exposure is set with --expose-* flags;
+#     see ai-agents-development for the model/tools manifest hand-edits.
+foundry agents create --name "My Agent" --description "desc" \
+  --system-prompt /tmp/system_prompt.md \
+  --knowledge-bases "Runbook Docs" --expose-charlotte-chat --no-prompt
+
+# 6. UI pages (standalone full-page views)
+foundry ui pages create --name "my-page" --description "desc" --from-template React --homepage --no-prompt
+foundry ui navigation add --name "My Page" --path / --ref pages.my-page
+
+# 6b. UI extensions (sidebar widgets embedded in detection/host/incident pages)
+# Run `foundry ui extensions list-sockets` to see available socket IDs
+foundry ui extensions create --name "my-ext" --description "desc" --from-template React --sockets "activity.detections.details" --no-prompt
+```
+
+**Fail fast:** Validate right after API integrations and collections. `foundry apps validate` is a dry-run of deploy validation — it checks specs and schemas in seconds without building artifacts. It does NOT check workflow semantics or app name uniqueness (those are only checked on deploy). Don't validate right before deploy — deploy runs the same validation plus more. Let `adapt_spec_for_foundry.py` fix spec issues; if it misses one, patch only that spot and tell the user what it missed.
+
+### Step 6: Write Domain-Specific Content
+
+The CLI scaffolds structure but cannot generate app logic. Delegate to sub-skills:
+
+- **OpenAPI spec** → api-integrations
+- **Workflow YAML** → workflows-development
+- **UI components** → ui-development
+- **Function handlers** → functions-development
+- **Collection schemas** → collections-development
+- **AI agents / knowledge bases** → ai-agents-development
+
+> **Load the relevant sub-skill before writing domain-specific code.** Foundry formats and SDK calls differ from what general knowledge suggests, and these are the failures seen when the sub-skill wasn't loaded:
+>
+> | Writing... | Load | What goes wrong without it |
+> |---|---|---|
+> | Workflow YAML | `workflows-development` | Invented `definition/node_types/sdk_type` format instead of correct `trigger` + `actions` with `version_constraint` |
+> | Function code calling Falcon APIs | `functions-falcon-api` | Invented `request.falcon_client.api_request(url='/foundry/entities/...')` instead of FalconPy SDK classes (`from falconpy import Hosts`) |
+> | Function code calling a third-party API (Slack, Jira, PagerDuty, etc.) | `functions-falcon-api` + check `use-cases/` | Invented `falcon.command("createNotification")` or raw HTTP calls instead of `APIIntegrations().execute_command(definition_id="...", operation_id="...")`. The app MUST have an API integration (OpenAPI spec) for the service, then call it from the function via FalconPy `APIIntegrations` class. See foundry-sample-functions-python for reference. |
+> | Function code accessing collections | `collections-development` | Invented REST endpoints for collection CRUD instead of FalconPy `CustomStorage` service class |
+> | AI agent or knowledge base manifest | `ai-agents-development` | Invented `model` values, wrong `tools` reference format, or agents created before the knowledge bases they reference (fails validation) |
+
+### Step 7: Final Build and Deploy
+
+```bash
+# Build UI (required before deploy) — MUST cd back to app root afterward
+cd ui/pages/my-page && npm install && npm run build && cd ../../..
+# For extensions: cd ui/extensions/my-ext && npm install && npm run build && cd ../../..
+
+# IMPORTANT: Verify you are in the app root (where manifest.yml lives) before running
+# foundry apps/ui commands. The CLI resolves paths relative to cwd, not the manifest location.
+
+# Final deploy (run ONCE, never re-deploy to check status)
+foundry apps deploy --no-prompt --change-type Patch --change-log "Complete app"
+
+# Poll deployment status — run immediately, do NOT prepend sleep
+foundry apps list-deployments
+# If still in progress, wait 5s then poll again:
+# sleep 5 && foundry apps list-deployments
+
+# Local UI development (deploy first if UI calls backend capabilities)
+foundry ui run
+```
+
+**Deploy once, poll `list-deployments`** for the deployment version `deploy` printed (release numbers differ). Re-deploying duplicates it.
+
+**A `Failed` deployment has no reason in the CLI.** Read it in the console: **App manager > the app > "Show errors (N)"** (per capability). While a deploy runs, `foundry apps validate` fails with `deployment is currently in progress`; wait, it is not a manifest error.
+
+```bash
+# Release (run ONCE after deploy succeeds)
+foundry apps release --change-type Patch --deployment-id <id> --notes "Release notes"
+```
+
+**Note:** There is no `list-releases` command. After `release`, check status via the App Manager URL printed in the output, or wait ~30s and proceed to testing.
+
+**Patch releases update an installed app in place**; no reinstall. Reinstall (uninstall, then install) only to reach an API integration's credential form again, e.g. after adding an integration.
+
+`foundry ui run` only serves UI locally — backend capabilities (API integrations, functions, collections) resolve from the cloud. Deploy those first.
+
+## Multi-Cloud Deployment
+
+To deploy the same app to multiple clouds (US-1, US-2, US-3, EU-1, etc.):
+
+1. **Strip all IDs** before deploying to a new cloud — IDs are cloud-specific:
+   ```bash
+   yq -i 'del(.. | select(has("id")).id) | del(.. | select(has("app_id")).app_id)' manifest.yml
+   ```
+   This DELETES the keys entirely. Setting them to empty/null is NOT the same and will cause errors.
+
+2. **Switch profile** to the target cloud:
+   ```bash
+   foundry profile activate --name "eu-1-profile"
+   ```
+
+3. **Deploy and release** as normal.
+
+4. **Install from App Catalog** — after releasing on a new cloud, the app must be explicitly installed from the Falcon console App Catalog. It does NOT auto-install.
+
+5. **Wait for propagation** — installation may take several minutes before the page URL becomes accessible. A 404 on `/api2/ui-extensions/entities/pages/v1` immediately after install is normal; retry after a few minutes.
+
+**Important:** Back up your manifest before stripping IDs if you want to preserve the original cloud's IDs: `cp manifest.yml manifest.yml.backup`
+
+## Existing App Workflow
+
+When `manifest.yml` already exists, work is primarily editing existing files. Use CLI only for:
+- `foundry apps run` / `foundry ui run` — local development
+- `foundry apps deploy` / `foundry apps release` — deployment
+- `foundry api-integrations create` etc. — adding new capabilities
+
+## Manifest Coordination
+
+**Dependency order:** Collections → Functions → Knowledge bases → Agents → Workflows → UI (each may depend on the previous)
+
+- **MUST NOT edit manifest.yml** unless a deploy fails with "app name already exists" (rename only). The CLI sets `path`, `entrypoint`, scopes, and IDs correctly — manual edits cause double-path errors and wasted deploy cycles.
+- **Narrow exception:** `ai.agents[].model` and `.tools` have no CLI flags and can only be set by editing `manifest.yml`. Edit those two keys only — see `ai-agents-development`. (Agent `exposure` *does* have `--expose-*` flags; set it at create time.)
+- **MUST NOT edit vite.config.js** — the React blueprint is turnkey. Do not change `base`, `root`, or `noAttr()`. Just edit React/JS component code and deploy.
+- OAuth scopes are auto-managed for CLI-created artifacts — MUST NOT manually add `api-integrations:read`
+- Use `npx @redocly/cli lint` for OpenAPI validation (not Python/Ruby YAML parsers)
+- Validate early with `foundry apps validate --no-prompt` after adding API integrations and collections — but don't validate right before deploy (deploy runs the same checks plus more)
+
+## Reading Guide
+
+| Task | Reference |
+|------|-----------|
+| Headless/CI setup, env vars, US-GOV-1 | [references/headless-operation.md](references/headless-operation.md) |
+| Superpowers plugin coordination | [references/superpowers-integration.md](references/superpowers-integration.md) |
+| Token management, performance targets | [references/performance-optimization.md](references/performance-optimization.md) |
+| Common wrong turns (CLI vs hand-written files) | [references/counter-rationalizations.md](references/counter-rationalizations.md) |
+| Lifecycle phases, manifest patterns, CLI state, app operations, local e2e runs | [references/advanced-patterns.md](references/advanced-patterns.md) |
+
+## Improving These Skills
+
+If a skill gave incorrect guidance, was missing a pattern, or required extra trial-and-error to get right, the user can ask you to capture the fix at the end of the session:
+
+```
+What did you learn from this session that could improve the Foundry skills?
+Clone https://github.com/CrowdStrike/foundry-skills.git,
+create a branch, update the skills with this knowledge, and
+create a PR on GitHub.
+```
+
+Steps Claude will handle: create a branch, update the relevant `skills/*/SKILL.md`, and create a PR.
+
+This turns a one-session fix into a permanent improvement for all users.

@@ -1,0 +1,6 @@
+{
+  "repository": "anthropics/skills",
+  "ref": "main",
+  "path": "skills/mcp-builder/SKILL.md",
+  "source": "https://github.com/anthropics/skills/tree/main/skills/mcp-builder"
+}

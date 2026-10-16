@@ -1,0 +1,6 @@
+{
+  "repository": "stripe/ai",
+  "ref": "main",
+  "path": "skills/upgrade-stripe/SKILL.md",
+  "source": "https://github.com/stripe/ai/tree/main/skills/upgrade-stripe"
+}

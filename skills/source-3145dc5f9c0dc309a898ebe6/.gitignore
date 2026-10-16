@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# Node
+node_modules/
+
+# Eval run outputs (ephemeral artifacts from skill testing iterations)
+forge-app-builder-workspace/

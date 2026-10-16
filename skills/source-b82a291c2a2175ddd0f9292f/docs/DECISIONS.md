@@ -1,0 +1,339 @@
+# Decisions
+
+## ADR-0001: Phase 1 overlap matrix is sparse, not a 51x51 dense grid
+
+- Date: 2026-04-18
+- Status: accepted
+
+### Context
+
+Phase 1 requires a matrix of overlap across 51 reference files. A fully dense markdown
+grid would be large, hard to review, and low-signal for refactoring decisions.
+
+### Decision
+
+Represent the overlap matrix as a sparse matrix:
+
+- every reference file appears once,
+- only strong overlaps (`score >= 2`) are called out explicitly,
+- all omitted pairings are treated as `0` or `1`.
+
+### Consequences
+
+- The artifact stays readable enough to drive deduplication work in later phases.
+- The score rubric remains auditable.
+- Later restructuring can still consume the matrix without reverse-engineering a huge grid.
+
+## ADR-0002: Frontmatter `audit_level` preserves levels 1 through 4
+
+- Date: 2026-04-18
+- Status: accepted
+
+### Context
+
+The Phase 2 example shows `audit_level: [1, 2, 3]`, but the existing repository already
+defines four audit levels in `references/ops/security-audit-levels.md`, including a distinct
+Level 4 for expert / regulated / high-consequence reviews.
+
+### Decision
+
+Use the real repository scale in frontmatter:
+
+- `audit_level` may contain any subset of `[1, 2, 3, 4]`
+- existing references that already target Level 4 keep that scope
+
+### Consequences
+
+- Metadata remains aligned with the current audit model instead of silently downgrading it.
+- Later tooling can still down-scope to `[1, 2, 3]` if a consumer only supports three levels.
+
+## ADR-0003: `references/` directory structure follows frontmatter `category`
+
+- Date: 2026-04-18
+- Status: accepted
+
+### Context
+
+Phase 3 requires moving the flat `references/` layout into domain folders:
+
+- `appsec`
+- `infra`
+- `iam`
+- `platform`
+- `ai`
+- `privacy`
+- `ops`
+- `compliance`
+
+Several files are borderline by subject matter. Examples:
+
+- `threat-modeling.md` could be read as `appsec` or `ops`
+- `coverage-matrix.md` is governance/meta, not a runtime control
+- `cloud-iam-hardening.md` spans cloud and identity
+
+### Decision
+
+The physical path under `references/` must follow the existing `category` field in each file's
+frontmatter. This keeps one source of truth for routing and later index generation.
+
+### Consequences
+
+- Category disputes are resolved in metadata first, then inherited by filesystem layout.
+- `references/_index.md` can be generated mechanically from frontmatter without custom exception logic.
+- If a file changes domain later, its frontmatter category is the change control point.
+
+## ADR-0004: `_core-invariants.md` is a root-level exception under `references/`
+
+- Date: 2026-04-18
+- Status: accepted
+
+### Context
+
+Phase 4 requires a single shared file at `references/_core-invariants.md` so the skill can load
+the baseline invariants once, independently of domain routing.
+
+This conflicts with ADR-0003, which moved all references into domain directories based on
+frontmatter `category`.
+
+### Decision
+
+Allow exactly two root-level machine-facing files under `references/`:
+
+- `_index.md`
+- `_core-invariants.md`
+
+All other reference files must stay in their category folders.
+
+### Consequences
+
+- The skill can load one shared baseline file without overloading a domain bucket.
+- Index generation must explicitly tolerate `_core-invariants.md`.
+- Future root-level additions require a new ADR instead of quietly bypassing the taxonomy.
+
+## ADR-0005: Phase 5 evals use an offline fixture-integrity runner
+
+- Date: 2026-04-18
+- Status: accepted
+
+### Context
+
+Phase 5 requires `evals/cases/*.yaml`, `evals/negative/*.yaml`, and a simple runner that logs
+results in markdown.
+
+No model backend, agent harness, or golden-output execution contract is specified for this phase.
+That makes semantic assertions such as `must_mention` impossible to verify automatically without
+inventing a fake evaluator.
+
+### Decision
+
+Implement Phase 5 as an offline fixture-integrity harness:
+
+- validate case schema and required fields,
+- validate that referenced files resolve in the repository,
+- validate that positive cases include `references/_core-invariants.md`,
+- validate that positive routing targets appear in `SKILL.md`,
+- record semantic expectations such as `must_mention` as manual review checkpoints in the markdown report.
+
+### Consequences
+
+- The eval corpus becomes auditable and runnable without external services.
+- Routing regressions and broken paths are caught immediately.
+- Semantic quality checks remain explicit, but require a later model-backed harness if full automation is needed.
+
+## ADR-0006: Skill lint uses an allowlist plus example-domain heuristics
+
+- Date: 2026-04-18
+- Status: accepted
+
+### Context
+
+Phase 6 requires linting for non-allowlisted links and suspicious hidden instructions.
+
+This corpus intentionally contains:
+
+- official vendor and standards links,
+- placeholder hosts such as `example.com`,
+- private/internal sample hosts such as `*.internal` and `*.corp`,
+- adversary simulation hosts such as `attacker.com` inside defensive examples.
+
+### Decision
+
+Lint external links with two buckets:
+
+- explicit allowlist for official documentation and standards domains already used by the repo,
+- heuristic allowlist for placeholders, private sample hosts, local addresses, and explicit attacker-simulation hosts used in defensive examples.
+
+Also lint hidden prompt-injection patterns only when they appear in code fences or HTML comments without nearby defensive framing.
+
+### Consequences
+
+- The linter blocks accidental drift to random external domains.
+- Existing defensive examples remain valid instead of generating noisy false positives.
+- Future domains should be added intentionally instead of slipping into the corpus unnoticed.
+
+## ADR-0007: Phase 7 version anchors preserve the pre-refactor portable snapshot
+
+- Date: 2026-04-18
+- Status: accepted
+
+### Context
+
+Phase 7 requires tagging:
+
+- `v1.0.0` on the pre-refactor version already used by existing consumers,
+- `v2.0.0-rc.1` at the end of Phase 6.
+
+The refactor spans multiple local commits and the repository had no prior semantic tags.
+
+### Decision
+
+Anchor the tags to the last two meaningful boundaries already present in history:
+
+- `v1.0.0` -> commit `8feff18`, the last stable pre-phase-refactor portable skill snapshot on `main`
+- `v2.0.0-rc.1` -> commit `6dd535e`, the completed Phase 6 integrity baseline
+
+Phase 7 documentation updates live after those anchors and do not move either tag.
+
+### Consequences
+
+- Existing consumers get a stable tag that matches the last non-refactor layout already on `main`.
+- The v2 release candidate points to the first auditable/testable refactor milestone, not later documentation drift.
+- README install guidance can default to the stable tag while still exposing the release candidate.
+
+## ADR-0008: `INDEX.md` is the machine-facing corpus index and `README.md` stays human-facing
+
+- Date: 2026-04-18
+- Status: accepted
+
+### Context
+
+Phase 9 requires a clean separation between:
+
+- `README.md` for humans,
+- `INDEX.md` for agents and machine-oriented navigation,
+- `SKILL.md` as the routing layer.
+
+Before this phase, `README.md` also acted as a de facto corpus inventory, which mixed installation and human guidance with machine navigation.
+
+### Decision
+
+Split responsibilities explicitly:
+
+- `README.md` keeps install, release-channel, and human onboarding material,
+- `INDEX.md` becomes the compact machine-facing navigation surface with direct corpus links,
+- `SKILL.md` points to `INDEX.md` as the primary navigation hub and keeps `references/_index.md` for generated metadata only.
+
+### Consequences
+
+- Agents get a smaller, more stable navigation surface.
+- Human docs can stay rich without polluting the machine entrypoint.
+- Future corpus additions should update `INDEX.md` instead of expanding `README.md` with more routing detail.
+
+## ADR-0009: Bundle presets are archived and merged into `ai-tool-profiles`
+
+- Date: 2026-04-18
+- Status: accepted
+
+### Context
+
+The AI domain had a documented overlap cluster around:
+
+- `ai-tool-profiles.md`,
+- `ai-bundle-presets.md`,
+- `ai-cli-hardening.md`,
+- `ai-ide-no-code-security.md`.
+
+Phase 1 identified `ai-bundle-presets.md` as the clearest merge candidate because it acted as a packaging layer on top of the tool-profile templates rather than a distinct security domain.
+
+### Decision
+
+Keep one active reference for:
+
+- base tool profiles,
+- posture overlays,
+- ready-made bundle selection,
+- direct copy paths.
+
+Move the original `ai-bundle-presets.md` into `archive/` for traceability, and merge its operational guidance into `references/ai/ai-tool-profiles.md`.
+
+Also add:
+
+- `references/ai/_index.md` as a narrow router inside the AI domain,
+- `references/ai/agent-evals-red-teaming.md` to cover adversarial evaluation and regression gates, which was previously missing as a first-class AI reference.
+
+### Consequences
+
+- The active AI routing surface gets smaller and easier to choose from.
+- Existing bundle guidance remains available for historical consumers via `archive/`.
+- Downstream users now have one canonical path for profiles and bundles: `references/ai/ai-tool-profiles.md`.
+
+## ADR-0010: Browser/computer-use and RAG/retrieval get dedicated AI references
+
+- Date: 2026-04-18
+- Status: accepted
+
+### Context
+
+After the first AI cleanup, two high-risk sub-surfaces were still present mostly as subsections inside broader documents:
+
+- browser/computer-use and GUI-driving agents,
+- RAG, vector stores, and retrieval-layer security.
+
+Both areas have distinct controls, distinct failure modes, and strong enough official source material to justify standalone references.
+
+### Decision
+
+Add:
+
+- `references/ai/browser-computer-use-security.md`
+- `references/ai/rag-retrieval-security.md`
+
+Route them explicitly from:
+
+- `SKILL.md`
+- `INDEX.md`
+- `references/ai/_index.md`
+- `README.md`
+- `references/compliance/coverage-matrix.md`
+- positive eval fixtures
+
+### Consequences
+
+- AI routing becomes more precise for agent workflows that are currently rising in real-world risk.
+- `llm-agent-security.md` can stay as the general threat-model document instead of absorbing every AI subdomain.
+- The repo gains stronger coverage for authenticated web agents, GUI automation, vector-store authorization, and retrieval-layer poisoning.
+
+## ADR-0011: Operational scan-triage-fix loop becomes a first-class skill path
+
+- Date: 2026-08-20
+- Status: accepted
+
+### Context
+
+Through v2.0.0-rc.1 the skill is a routing layer plus reference corpus. Agents can load the right documents, but the repository does not define an executable loop that:
+
+- runs Semgrep and Gitleaks on a target scope,
+- maps findings to references,
+- applies defensive remediations,
+- re-scans before reporting done.
+
+CI already runs Semgrep/Gitleaks against this repository, but that does not help an agent reviewing AI-generated patches in another tree.
+
+### Decision
+
+Add an operational remediation path:
+
+- `references/appsec/ai-code-secure-remediation.md` as the runbook,
+- local Semgrep rules under `semgrep/` aligned to AI/vibecoder traps,
+- `scripts/secure-review.py` and `scripts/map_findings.py` as agent entrypoints,
+- an **Operational Review Loop** section in `SKILL.md`,
+- eval fixtures and CI smoke coverage for the loop.
+
+Scanner findings remain signals. Authorization and business-logic gaps stay manual via existing AppSec/IAM references. The skill stays defensive-only: no exploit PoCs.
+
+### Consequences
+
+- Agents have a concrete scan → triage → fix → re-scan procedure.
+- Routing and evals can assert remediation behavior, not only corpus selection.
+- Rule IDs and finding→reference maps become part of the maintained surface area.
+

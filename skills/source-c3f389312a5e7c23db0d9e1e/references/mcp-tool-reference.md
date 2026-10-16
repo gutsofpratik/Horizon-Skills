@@ -1,0 +1,155 @@
+# MCP Tool Reference
+
+Lazy-loaded reference for `carta-reporting`. `cat` this file on demand when resolving
+required params (Step 3) or filter IDs — it is not part of the always-loaded SKILL.md.
+
+```
+# Reads go through read_tool; reporting__create__report changes data, so it goes through call_tool
+
+call_tool({"name": "reporting__create__report", "arguments": { corporation_id, report_type, as_of_date, report_name, export_format: "json" }})
+  → { user_report_pk }
+  # Always pass export_format: "json". Never pass "xlsx".
+  #
+  # OPTIONAL params (any report type):
+  #   preview          — pass true for a faster partial report
+  #
+  #   Filter params — supported per report type:
+  #   Full support (stakeholder_ids, equity_plan_ids, security_ids, share_class_ids, issued_from, issued_to):
+  #     exercised_and_settled_report, equity_plan_report, vesting_details_report,
+  #     historical_terminations_report, common_securities_report, equity_awards_outstanding,
+  #     equity_plan_granted_report, options_outstanding_report, securities_ledger_report,
+  #     share_registry_report, rule_701_report, canceled_and_returned_report, eightythreeb_elections_report
+  #   termination_modeling_report: equity_plan_ids, security_ids, share_class_ids, issued_from, issued_to (stakeholder_ids not supported)
+  #   stakeholder_ledger_report, stakeholder_details_report: stakeholder_ids only
+  #   Passing unsupported filters for a report type has no effect.
+  #   stakeholder_ids  — comma-separated integer IDs, e.g. "42,7,99"
+  #   equity_plan_ids  — comma-separated integer IDs
+  #   security_ids     — comma-separated TYPE:ID strings, e.g. "CERTIFICATE:42,OPTION:7"
+  #     valid types: CERTIFICATE, RSA, RSU, OPTION, SAR, CBU, PIU, WARRANT, CONVERTIBLE_NOTE
+  #   share_class_ids  — comma-separated integer IDs
+  #   issued_from      — grant issuance start date, MM/DD/YYYY
+  #   issued_to        — grant issuance end date, MM/DD/YYYY
+  #
+  # REQUIRED params by report_type — the API fails silently or errors if these are omitted.
+  # Collect any that the user has not already provided via AskUserQuestion BEFORE calling this command.
+  #
+  # Each entry in the reporting:search:report_types response carries a params_schema for its own
+  # report type, generated from the same source as this table. Prefer it when present; this table
+  # is the fallback for when search was not called.
+  #
+  #   stakeholder_ownership_details_report
+  #     stakeholder_pk       — the stakeholder to report on (REQUIRED)
+  #
+  #   termination_modeling_report
+  #     stakeholder_pk       — the stakeholder to model (REQUIRED)
+  #     termination_reason   — one of: voluntary | involuntary | with_cause |
+  #                            retirement | disability | death (REQUIRED)
+  #
+  #   historical_terminations_report
+  #     stakeholder_pk       — the stakeholder whose history to pull (REQUIRED)
+  #
+  #   vesting_details_report
+  #     stakeholder_pk       — filter to a specific stakeholder (REQUIRED)
+  #     issued_from          — grant issuance start date, MM/DD/YYYY (REQUIRED)
+  #     issued_to            — grant issuance end date, MM/DD/YYYY (REQUIRED)
+  #
+  #   cap_table_summary_report
+  #     reports              — comma-separated sub-reports to include (REQUIRED):
+  #                            summary_cap | intermediate_cap | detailed_cap |
+  #                            ledgers | drafts | summary_grouped_cap
+  #     # Unrecognised names are dropped silently, and so are names the caller may not run:
+  #     #   intermediate_cap  — never available to a share-class-scoped admin. The sheet rolls every
+  #     #     non-preferred holder into one aggregate row, which would disclose out-of-scope
+  #     #     holdings. Offer summary_cap / detailed_cap / ledgers instead; do not retry.
+  #     #   transactions_ledger — Carta staff only, for every role.
+  #     # A dropped sheet is absent from the workbook, so it reads as filtered_row_count = 0
+  #     # rather than an error. Do not report that as "no rows matched those filters".
+  #     group_selected       — grouping dimension, e.g. 'Relationship', 'Cost Center',
+  #                            'Job Title' (REQUIRED when reports includes summary_grouped_cap)
+  #
+  #   equity_plan_report
+  #     starting_date        — report period start, MM/DD/YYYY (REQUIRED)
+  #     ending_date          — report period end, MM/DD/YYYY (REQUIRED)
+  #     show_stakeholder_sums_sheet  — true | false (REQUIRED)
+  #     show_events_ledger_sheet     — true | false (REQUIRED)
+
+# Filter ID lookup commands:
+read_tool({"name": "cap_table__get__stakeholders", "arguments": { corporation_id }})
+  → { count: N, by_type: { employee: N, investor: N, ... } }
+  # Summary mode (no search param) — returns total stakeholder count and breakdown by type.
+  # Use count to infer company size for status message branching (Step 4).
+
+read_tool({"name": "cap_table__get__stakeholders", "arguments": { corporation_id, search: "<name>" }})
+  → { results: [{ id, full_name, email, event_relationship }] }
+  # Search mode — resolves a stakeholder name to its numeric id for use in stakeholder_ids.
+  # search matches full_name and email. Available to all users.
+
+read_tool({"name": "cap_table__get__certificate_share_classes", "arguments": { corporation_id }})
+  → { results: [{ id, name, prefix }] }
+  # Returns available share classes (Common, Series A, etc.) with their numeric id.
+  # Not staff-only: admits staff, company editors, HR admins, and in-scope share-class-scoped
+  # admins. A read-only company viewer IS rejected (403) — fall back to AskUserQuestion.
+  # For a scoped admin the result is already narrowed to their share classes.
+
+read_tool({"name": "cap_table__get__option_plans", "arguments": { corporation_id }})
+  → { results: [{ id, name, common_share_class_id, size, available_quantity, is_expired }] }
+  # Returns equity plans with their numeric id and linked share class id.
+  # Not staff-only: same admission as certificate_share_classes above, and likewise pre-narrowed
+  # for a share-class-scoped admin. A read-only company viewer IS rejected (403).
+  # common_share_class_id links a plan to its share class — use to resolve equity_plan_ids
+  # when the user filters by share class.
+
+# security_ids — resolve label to TYPE:ID (all available to non-staff users):
+#
+# These resolve a label through the security's LIST endpoint, which is share-class scoped. For a
+# share-class-scoped admin a security outside the scope is simply absent, so the lookup reports the
+# label as not found — identical to a typo. Do not retry it, do not widen the search, and do not
+# call it an error: say the security is not in the part of the cap table this account can see.
+read_tool({"name": "cap_table__get__certificate", "arguments": { corporation_id, label: "<label>" }})
+  → { id, label, ... }   # CERTIFICATE:<id>
+
+read_tool({"name": "cap_table__get__option_grant", "arguments": { corporation_id, label: "<label>" }})
+  → { id, label, ... }   # OPTION:<id>
+
+read_tool({"name": "cap_table__get__rsu", "arguments": { corporation_id, label: "<label>" }})
+  → { id, label, ... }   # RSU:<id>
+
+read_tool({"name": "cap_table__get__rsa", "arguments": { corporation_id, label: "<label>" }})
+  → { id, label, ... }   # RSA:<id>
+
+read_tool({"name": "cap_table__get__piu", "arguments": { corporation_id, label: "<label>" }})
+  → { id, label, ... }   # PIU:<id>
+
+read_tool({"name": "cap_table__get__warrant", "arguments": { corporation_id, label: "<label>" }})
+  → { id, label, ... }   # WARRANT:<id>
+
+read_tool({"name": "cap_table__list__sars", "arguments": { corporation_id, search: "<label>", detail: "minimal" }})
+  → { results: [{ id, label, ... }] }   # SAR:<id>
+
+read_tool({"name": "cap_table__list__cbus", "arguments": { corporation_id, search: "<label>", detail: "minimal" }})
+  → { results: [{ id, label, ... }] }   # CBU:<id>
+
+read_tool({"name": "cap_table__get__limited_admin_scope", "arguments": { corporation_id }})
+  → { corporation_id, is_limited_admin,
+      share_classes: [{ id, name, prefix }] | null, option_plan_ids: [...] | null }
+  # Whether this caller's cap-table access is narrowed to specific share classes.
+  # null means unrestricted; [] means the grant denies every share class — never read one as the
+  # other. A 403/404 or a missing command means "treat as unrestricted": every other cap_table
+  # command already scopes itself server-side, so this only affects how the result is described.
+
+read_tool({"name": "reporting__search__report_types", "arguments": { corporation_id, query, json_export_supported: true }})
+  → {
+      reports: [{report_type, name, similarity, answers_question, params_schema}],
+      questions: [{question, similarity, answers, hide_from_ui}]
+    }
+  # `reports` is already filtered to what this account may run — a share-class-scoped admin sees a
+  # shorter list. A report type absent from it is unavailable, not mis-ranked: never fall back to a
+  # hardcoded list and never retry it.
+
+read_tool({"name": "reporting__get__report_status", "arguments": { user_report_pk }})
+  → { status }   # status: "pending" | "complete" | "error" | "not_found"
+                 # corporation_id not required — endpoint is user-scoped
+
+read_tool({"name": "reporting__get__download_url", "arguments": { user_report_pk, corporation_id }})
+  → { download_url }   # S3 presigned URL — pass to report_processor.py, not WebFetch
+```

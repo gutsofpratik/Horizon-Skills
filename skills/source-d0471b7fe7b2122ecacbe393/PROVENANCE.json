@@ -1,0 +1,6 @@
+{
+  "repository": "anthropics/claude-plugins-official",
+  "ref": "main",
+  "path": "plugins/math-proof/skills/siege/SKILL.md",
+  "source": "https://github.com/anthropics/claude-plugins-official/tree/main/plugins/math-proof"
+}

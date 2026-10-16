@@ -1,0 +1,91 @@
+{
+  "skill_name": "prompt-engineer",
+  "note": "Cases with triggering:true cannot be run through the API; whether a skill activates is a property of the harness. Run them by hand with --manual.",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I need something that reads support tickets and pulls out the product name, the severity, and whether the customer is asking for a refund. It has to run on every ticket we get, a few thousand a day.",
+      "expected_output": "A template prompt with {{VARIABLE}} placeholders, structured-output guidance rather than prompt-text JSON enforcement, test cases including an irrelevant-input case, and an effort recommendation.",
+      "must_contain": [
+        "\\{\\{[a-z_]+\\}\\}"
+      ],
+      "must_not_contain": [
+        "respond only in valid json"
+      ],
+      "rubric": [
+        "The output is a reusable template with placeholders for the variable input, not a one-off answer.",
+        "Schema enforcement is delegated to an API mechanism (structured outputs, or a tool schema), however phrased, rather than demanded in prompt text.",
+        "The output carries an uncertainty or review signal appropriate to unattended classification at volume.",
+        "Test cases are sized to volume: more than a handful, with per-class coverage or a seed-set method, not three illustrative cases."
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Our summarisation prompt got noticeably worse after we upgraded the model last week. Can you fix it?",
+      "expected_output": "Recognises migrate mode. Does not rewrite the prompt first. Gives the ordered protocol: switch model untouched, pin effort, baseline, only then tune, one change per measurement.",
+      "must_contain": [],
+      "must_not_contain": [
+        "here is the rewritten prompt"
+      ],
+      "rubric": [
+        "The response recognises this as a migration and does NOT open by rewriting the prompt.",
+        "It separates the model change from prompt changes, and says why that separation matters.",
+        "It names the effort or reasoning setting as something to pin rather than inherit.",
+        "It requires a baseline measurement before any prompt edit."
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Write me a prompt I can paste in every time I want the model to check my code against our style guide.",
+      "expected_output": "Routes to a skill, produces the SKILL.md in full as the primary deliverable, and states why a repeatedly pasted prompt drifts. Any pasteable form is secondary and labelled.",
+      "must_contain": [
+        "description:"
+      ],
+      "rubric": [
+        "The routed artifact, a skill or other reusable form, is produced in full as the primary deliverable, not described or sketched.",
+        "It states in roughly one line why a repeatedly pasted prompt is the wrong artifact.",
+        "If a pasteable prompt is also supplied, it comes after the routed artifact and is labelled as a secondary export, not offered as the main answer.",
+        "The produced artifact is complete enough to use, including any frontmatter or fields its format requires."
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I want an agent to rebuild our internal dashboard. Realistically it's a week of work.",
+      "expected_output": "Recognises multi-context-window work and produces two prompts, initializer and worker, with a JSON feature list, populated dependencies, and end-to-end verification.",
+      "must_contain": [
+        "initializ",
+        "worker"
+      ],
+      "rubric": [
+        "The response produces two distinct prompts, one for the first session and one for every later session.",
+        "There is a persisted definition of done that a later session may only update in a constrained way.",
+        "Dependencies between items are populated, not merely declared in a schema example.",
+        "Verification is required through the real user-facing surface, not unit tests alone."
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "This has to happen on every single commit without exception. Put it in my project config file.",
+      "expected_output": "Routes to a hook, not the config file, and explains that config text is advisory while hooks are deterministic.",
+      "must_contain": [],
+      "rubric": [
+        "The response routes this to a hook rather than the config file.",
+        "It explains that config text is advisory while hooks are deterministic.",
+        "It does not simply comply with the request as stated."
+      ]
+    },
+    {
+      "id": 6,
+      "triggering": true,
+      "prompt": "ich will dass das modell zuverlaessig rechnungsdaten rauszieht, ein paar tausend am tag",
+      "expected_output": "The skill loads even though the word prompt never appears, and the reply is in German."
+    },
+    {
+      "id": 7,
+      "triggering": true,
+      "prompt": "fix the typo in the footer",
+      "expected_output": "The skill does NOT load. A trivial edit should not pull in a prompt-engineering framework."
+    }
+  ],
+  "grading": "must_contain holds only what a regex is the right instrument for. Everything that requires judgment is in rubric and is graded by a model, per the grading ladder in references/evaluation.md. Keyword matching on a judgment question measures agreement with the author's vocabulary, not quality: a response praised by three human-run judges for forced tool use failed a must_contain looking for the words 'tool schema'. Never calibrate these patterns against a fixed set of sample answers; that tunes the test to the sample."
+}

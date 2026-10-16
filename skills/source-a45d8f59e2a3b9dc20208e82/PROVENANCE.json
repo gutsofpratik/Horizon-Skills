@@ -1,0 +1,6 @@
+{
+  "repository": "vercel-labs/agent-browser",
+  "ref": "main",
+  "path": "skills/agent-browser/SKILL.md",
+  "source": "https://github.com/vercel-labs/agent-browser/tree/main/skills/agent-browser"
+}

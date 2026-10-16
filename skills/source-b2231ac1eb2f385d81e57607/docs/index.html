@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>断舍离.skill —— 第一个劝你删 skill 的 skill</title>
+<meta name="description" content="断舍离.skill（danshari.skill）审计你装的全部 agent skill，把模型已经会的、harness 已自带的、MCP 已接管的移除：三分法定性、五问取证、盲测复核，归档可一键恢复，永不 rm。支持 Claude Code / OpenClaw / Codex / Hermit，MIT 开源，零依赖。">
+<meta name="keywords" content="断舍离.skill,断舍离 skill,danshari.skill,danshari-skill,Claude Code skill,agent skill 清理,skill 审计,skill 移除,token 优化,context engineering,AI agent">
+<meta name="author" content="swaylq">
+<meta name="theme-color" content="#fbfaf8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1a18" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://swaylq.github.io/danshari-skill/">
+<link rel="alternate" hreflang="zh-Hans" href="https://swaylq.github.io/danshari-skill/">
+<link rel="alternate" hreflang="en" href="https://swaylq.github.io/danshari-skill/en/">
+<link rel="alternate" hreflang="x-default" href="https://swaylq.github.io/danshari-skill/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:site_name" content="断舍离.skill">
+<meta property="og:title" content="断舍离.skill —— 第一个劝你删 skill 的 skill">
+<meta property="og:description" content="整个生态都在做加法，没有人做减法。断舍离.skill 审计你装的全部 skill，把模型已经会的、harness 已自带的、MCP 已接管的移除 —— 盲测取证，归档可恢复，永不 rm。">
+<meta property="og:url" content="https://swaylq.github.io/danshari-skill/">
+<meta property="og:image" content="https://swaylq.github.io/danshari-skill/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="断舍离.skill —— 第一个劝你删 skill 的 skill">
+<meta name="twitter:description" content="整个生态都在做加法，没有人做减法。审计你装的全部 skill，移除模型已经会的、harness 已自带的、MCP 已接管的。">
+<meta name="twitter:image" content="https://swaylq.github.io/danshari-skill/assets/og.png">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "断舍离.skill",
+      "alternateName": ["danshari.skill", "danshari-skill", "断舍离 skill"],
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS, Linux, Windows",
+      "url": "https://swaylq.github.io/danshari-skill/",
+      "downloadUrl": "https://github.com/swaylq/danshari-skill",
+      "codeRepository": "https://github.com/swaylq/danshari-skill",
+      "programmingLanguage": ["Python", "Shell", "Markdown"],
+      "license": "https://opensource.org/licenses/MIT",
+      "description": "审计你装的全部 agent skill，把模型已经会的、harness 已自带的、MCP 已接管的移除。三分法定性、五问取证、盲测复核，归档可一键恢复，永不 rm。",
+      "author": { "@type": "Person", "name": "swaylq", "url": "https://github.com/swaylq" },
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "断舍离.skill 是什么？",
+          "acceptedAnswer": { "@type": "Answer", "text": "一个 agent skill，作用是审计你已经安装的其它 skill，把当前模型已经会做的、harness 已经内建的、MCP 服务器已经接管的那些找出来并归档移除，从而省下它们每一轮占用的描述 token。" }
+        },
+        {
+          "@type": "Question",
+          "name": "为什么要删 skill？装着不用不行吗？",
+          "acceptedAnswer": { "@type": "Answer", "text": "不行。每个 skill 的名字和描述都会进入每一轮的系统提示词，是常驻开销；描述之间还会互相抢触发，触发错比没装更糟；里面的路径、API、模型名过期后每触发一次就误导一次。" }
+        },
+        {
+          "@type": "Question",
+          "name": "会不会误删我重要的 skill？",
+          "acceptedAnswer": { "@type": "Answer", "text": "不会直接删。判决表先给你逐条过目、逐条可否决；知识型 skill（私有事实、账号、内部约定）是红线永不删；所有移除都是移进归档目录，MANIFEST 留痕，一条命令即可恢复，全程不执行 rm。" }
+        },
+        {
+          "@type": "Question",
+          "name": "什么时候该跑一次断舍离？",
+          "acceptedAnswer": { "@type": "Answer", "text": "换模型、harness 大版本升级、新接了 MCP 服务器，或者距上次审计超过 90 天。新模型发布日就是 skill 断舍离日。" }
+        },
+        {
+          "@type": "Question",
+          "name": "支持哪些 agent？",
+          "acceptedAnswer": { "@type": "Answer", "text": "任何读 SKILL.md 的 host，包括 Claude Code、OpenClaw、Codex、Hermit；skill 装在非标准路径时用 tools/inventory.py --root 指定目录即可。" }
+        }
+      ]
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="shell topbar-in">
+    <a class="wordmark" href="/danshari-skill/">断舍离<span class="dot">.</span>skill</a>
+    <nav class="topnav">
+      <a class="hide-sm" href="#cost">为什么</a>
+      <a class="hide-sm" href="#method">怎么判</a>
+      <a class="hide-sm" href="#trust">凭什么放心</a>
+      <a href="#install">安装</a>
+      <a href="en/">EN</a>
+      <a href="https://github.com/swaylq/danshari-skill">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <section class="shell hero">
+    <p class="eyebrow">danshari.skill · MIT · 零依赖</p>
+    <h1>第一个劝你删 skill 的 skill<span class="dot">.</span></h1>
+    <p class="lede">
+      整个生态都在做加法 —— awesome 列表收录上千个 skill，单个仓库敢塞三百多个。<strong>没有人做减法。</strong>
+      但 skill 不是免费的：每装一个，每一轮都在付它的 token 税；模型每变强一代，就有一批 skill 从资产变成负债。
+    </p>
+
+    <blockquote class="pull">
+      断舍离.skill 删的是「教模型做它已经会的事」，<br>
+      留的是「告诉模型它不可能知道的事」。
+    </blockquote>
+
+    <div class="cta">
+      <a class="btn btn-primary" href="https://github.com/swaylq/danshari-skill">在 GitHub 上查看 →</a>
+      <a class="btn btn-ghost" href="#demo">看一次真实审计</a>
+    </div>
+
+    <div class="copyline">
+      <span class="scroll"><code id="install-cmd">git clone https://github.com/swaylq/danshari-skill.git ~/.claude/skills/danshari-skill</code></span>
+      <button type="button" data-copy="#install-cmd">复制</button>
+    </div>
+
+    <dl class="stats">
+      <div class="stat"><dt>演示审计结果</dt><dd>12 → 5</dd></div>
+      <div class="stat"><dt>每轮描述税</dt><dd class="cut">−66<span class="unit">%</span></dd></div>
+      <div class="stat"><dt>运行依赖</dt><dd>0</dd></div>
+      <div class="stat"><dt>执行过的 rm</dt><dd>0<span class="unit"> 次</span></dd></div>
+    </dl>
+  </section>
+
+  <section class="section" id="cost">
+    <div class="shell">
+      <div class="section-head">
+        <p class="kicker">为什么要减</p>
+        <h2>skill 不是免费的，你在付三重成本</h2>
+        <p>装的时候都有理由，删的契机永远不来 —— 于是 skill 目录只增不减，而模型一直在变强。</p>
+      </div>
+      <div class="cards">
+        <article class="card">
+          <h3>token 税</h3>
+          <p>它的名字和描述进<strong>每一轮</strong>的系统提示词，是常驻支出。十几个 skill 起步就是每轮两千 token，你为它付钱，无论今天用不用得上。</p>
+        </article>
+        <article class="card">
+          <h3>误触发</h3>
+          <p>描述之间互相抢活。触发错一次比没有 skill 更糟 —— 模型带着一份过时的操作手册，理直气壮地走错方向。</p>
+        </article>
+        <article class="card">
+          <h3>腐烂</h3>
+          <p>里面写死的路径、API、模型名会过期。一个腐烂的 skill 每触发一次就误导一次，而它自己不会告诉你它已经过期了。</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="demo">
+    <div class="shell">
+      <div class="section-head">
+        <p class="kicker">效果</p>
+        <h2>不是「删几个看着不顺眼的」</h2>
+        <p>是对着你此刻的模型、harness、MCP，逐个过堂、拿证据判。</p>
+      </div>
+      <div class="terminal">
+        <div class="terminal-bar">
+          <span class="lamp"></span><span class="lamp"></span><span class="lamp"></span>
+          <span class="path">~/.claude/skills — 断舍离.skill</span>
+        </div>
+<pre><span class="u">你      ❯</span> 换了新模型，帮我把 skill 断舍离一下
+
+<span class="a">断舍离  ❯</span> 环境快照：claude-fable-5 · Claude Code（内建搜索 / 子 agent /
+          自动记忆 / 计划模式）· MCP ×3（slack / github / playwright）
+
+          盘点：<span class="hi">12 个 skill，描述税 ~2,160 token/轮</span> —— 每一轮都在付。
+
+          盲测 think-harder：不加载它，裸 agent 排查一个真实竞态 bug，
+          质量持平 → 模型已内化，这 210 token/轮白付了。
+
+          判决：<span class="cut">✂️ 移除 ×6</span> · 🔧 修剪 ×1 · 🔗 合并 ×1 · ⏳ 缓刑 ×1 · <span class="keep">✅ 保留 ×2</span>
+          逐条依据在报告里 —— 确认执行？
+
+<span class="u">你      ❯</span> 确认，但 browser-scrape 里的选择器脚本要留
+
+<span class="a">断舍离  ❯</span> 收到：脚本先迁出到 scripts/，壳再归档。
+          已归档 7 个（一键可恢复）、修剪 1 个（58 行 → 9 行）、合并 1 对。
+
+          <span class="hi">12 个 → 5 个，每轮省 ~1,425 token（−66%）。</span>
+          恢复：tools/archive.sh --restore &lt;name&gt;</pre>
+      </div>
+      <p style="margin-top:var(--s-5);font-size:var(--text-sm);color:var(--ink-muted)">
+        完整报告（含每条判决的证据、盲测记录、修剪前后对比）：<a href="https://github.com/swaylq/danshari-skill/blob/main/examples/2026-08-17-demo/report.md">examples/2026-08-17-demo/report.md</a>
+      </p>
+    </div>
+  </section>
+
+  <section class="section" id="method">
+    <div class="shell">
+      <div class="section-head">
+        <p class="kicker">怎么判</p>
+        <h2>三分法定性，五问取证，盲测复核</h2>
+        <p>「模型越强 skill 越没用」只对第一类成立 —— 分不清类型的清理，删的都是不该删的那些。</p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>类型</th><th>定义</th><th>命运</th></tr></thead>
+          <tbody>
+            <tr><td>能力型</td><td>教模型怎么想、怎么做的通用方法</td><td class="verdict">模型升级会淘汰它 —— 审计重点</td></tr>
+            <tr><td>环境型</td><td>包装工具、补 harness 缺的功能</td><td class="verdict">harness 与 MCP 演进会取代它</td></tr>
+            <tr><td>知识型</td><td>私有事实：账号、路径、内部约定</td><td>永不因模型变强而过时（红线保护）</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="asks">
+        <div class="ask"><span>问一</span>模型已内化？</div>
+        <div class="ask"><span>问二</span>harness 已自带？</div>
+        <div class="ask"><span>问三</span>MCP 已接管？</div>
+        <div class="ask"><span>问四</span>被吞并 / 重复？</div>
+        <div class="ask"><span>问五</span>已经腐烂？</div>
+      </div>
+
+      <div class="section-head" style="margin-top:var(--s-16)">
+        <h2 style="font-size:var(--text-xl)">判决不止删留两档</h2>
+        <p>能力型 skill 被判移除之前，先开一个<strong>不加载它</strong>的子 agent 裸做它最典型的任务 —— 裸做不逊色才准删。证据，不是直觉。</p>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>判决</th><th>含义</th></tr></thead>
+          <tbody>
+            <tr><td>✂️ 移除</td><td>证据确凿 → 归档（可恢复），永不 rm</td></tr>
+            <tr><td>🔧 修剪</td><td>混合型：删过时的说教，留值钱的事实，常见 200 行剪成 10 行</td></tr>
+            <tr><td>🔗 合并</td><td>触发词打架的重复者，并入较优者</td></tr>
+            <tr><td>⏳ 缓刑</td><td>证据不足不硬判，记为下次审计重点</td></tr>
+            <tr><td>✅ 保留</td><td>它挣回了自己的 token 税</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="trust">
+    <div class="shell">
+      <div class="section-head">
+        <p class="kicker">凭什么放心</p>
+        <h2>一个要动你 skill 目录的工具，安全设计就是它的全部信用</h2>
+      </div>
+      <ul class="checks">
+        <li><span class="tick">✓</span><span><b>永不 rm</b> —— 一切移除都是挪进归档目录：<code>--restore</code> 一条命令恢复，MANIFEST 全程留痕。</span></li>
+        <li><span class="tick">✓</span><span><b>不确认不动手</b> —— 判决表先给你过目，逐条可否决。</span></li>
+        <li><span class="tick">✓</span><span><b>红线保护知识型</b> —— 私有事实、团队政策、被引用的脚本，证据再硬也不删。</span></li>
+        <li><span class="tick">✓</span><span><b>归档前搜身</b> —— 过时 skill 正文里常埋着不过时的私有事实（URL、账号、脚本），先迁出再归档。</span></li>
+        <li><span class="tick">✓</span><span><b>判决必须挂证据</b> —— 盲测记录、指名道姓的替代者（哪个内建工具、哪个 MCP）、腐烂实证，嘴判无效。</span></li>
+        <li><span class="tick">✓</span><span><b>自我审判条款</b> —— 断舍离自己每轮也收你约 180 token 的描述税，得靠省下更多来挣回；若你的模型裸做审计已同样好，请把断舍离也断舍离。</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section" id="install">
+    <div class="shell">
+      <div class="section-head">
+        <p class="kicker">安装</p>
+        <h2>一条 clone，装进任意 host</h2>
+        <p>装好后在 agent 里直接说「skill 断舍离」或「换了新模型，清理一下 skill」即可触发。</p>
+      </div>
+
+      <div class="copyline">
+        <span class="scroll"><code id="install-cmd-2">git clone https://github.com/swaylq/danshari-skill.git ~/.claude/skills/danshari-skill</code></span>
+        <button type="button" data-copy="#install-cmd-2">复制</button>
+      </div>
+
+      <div class="table-wrap hosts">
+        <table>
+          <thead><tr><th>Host</th><th>目标路径</th></tr></thead>
+          <tbody>
+            <tr><td>Claude Code</td><td><code>~/.claude/skills/danshari-skill</code></td></tr>
+            <tr><td>OpenClaw</td><td><code>~/.openclaw/skills/danshari-skill</code></td></tr>
+            <tr><td>Codex</td><td><code>~/.codex/skills/danshari-skill</code></td></tr>
+            <tr><td>Hermit</td><td><code>~/.hermit/skills/danshari-skill</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p style="margin-top:var(--s-6);font-size:var(--text-sm);color:var(--ink-muted);max-width:var(--measure)">
+        只想要方法论？把 <a href="https://github.com/swaylq/danshari-skill/blob/main/SKILL.md">SKILL.md</a>
+        和 <a href="https://github.com/swaylq/danshari-skill/blob/main/references/rubric.md">references/rubric.md</a>
+        直接喂给你的 agent 也能跑。
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="foot">
+  <div class="shell">
+    <div class="foot-line">
+      <a href="https://github.com/swaylq/danshari-skill">GitHub</a>
+      <a href="https://github.com/swaylq/danshari-skill/blob/main/SKILL.md">SKILL.md</a>
+      <a href="https://github.com/swaylq/danshari-skill/blob/main/references/rubric.md">判据细则</a>
+      <a href="https://github.com/swaylq/danshari-skill/blob/main/examples/2026-08-17-demo/report.md">演示审计</a>
+      <a href="en/">English</a>
+      <a href="https://swaylq.github.io/">更多开源项目</a>
+      <span style="color:var(--ink-faint)">MIT © <a href="https://github.com/swaylq">swaylq</a></span>
+    </div>
+    <p class="closing">
+      整个生态都在做加法。断舍离.skill 做减法 —— <em>加法越繁荣，减法越必要。</em>
+    </p>
+  </div>
+</footer>
+
+<script>
+document.querySelectorAll('[data-copy]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var text = document.querySelector(btn.dataset.copy).textContent.trim();
+    navigator.clipboard.writeText(text).then(function () {
+      var old = btn.textContent;
+      btn.textContent = '已复制';
+      setTimeout(function () { btn.textContent = old; }, 1600);
+    });
+  });
+});
+</script>
+
+</body>
+</html>

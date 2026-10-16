@@ -1,0 +1,1293 @@
+{
+  "meta": {
+    "title": "变形记 · 厨房这一侧",
+    "book": {
+      "title": "Die Verwandlung（变形记）",
+      "author": "Franz Kafka",
+      "year": 1915,
+      "author_died": 1924,
+      "lang": "de",
+      "pd_status": "public-domain-worldwide",
+      "translation_note": "剧本文字为原创改编；所有原文引用取自 1915 年德文初版（公有领域），中译为改编者自译"
+    },
+    "player": {
+      "name": "你",
+      "role": "萨姆沙家的帮厨女孩，约十六岁",
+      "note": "原著只给了她一句话：厨娘走后，这个约十六岁的女孩勇敢地留了下来。她没有名字。"
+    },
+    "palette": {
+      "bg": "#17130f",
+      "panel": "#201a13",
+      "text": "#d9cfbf",
+      "dim": "#7d7160",
+      "accent": "#b98a4e"
+    },
+    "credits": "本作品为《变形记》（卡夫卡，1915）的改编游戏，非原著。原著已进入公有领域。改编：入戏.skill",
+    "cover": "art/cover.jpg"
+  },
+  "cast": {
+    "me": {
+      "name": "你",
+      "short": "你",
+      "hue": 40,
+      "shape": "small",
+      "note": "帮厨女孩，玩家，无立绘"
+    },
+    "koechin": {
+      "name": "厨娘",
+      "short": "厨",
+      "hue": 96,
+      "shape": "round",
+      "note": "老厨娘，你的师傅",
+      "img": "art/cast/koechin.webp"
+    },
+    "anna": {
+      "name": "安娜",
+      "short": "安",
+      "hue": 320,
+      "shape": "tall",
+      "note": "正牌女仆，比你年长",
+      "img": "art/cast/anna.webp"
+    },
+    "mother": {
+      "name": "太太",
+      "short": "母",
+      "hue": 52,
+      "shape": "bent",
+      "note": "萨姆沙太太，哮喘",
+      "img": "art/cast/mother.webp"
+    },
+    "father": {
+      "name": "老爷",
+      "short": "父",
+      "hue": 8,
+      "shape": "broad",
+      "note": "萨姆沙先生",
+      "img": "art/cast/father.webp"
+    },
+    "grete": {
+      "name": "葛蕾特",
+      "short": "妹",
+      "hue": 195,
+      "shape": "small",
+      "note": "小姐，十七岁",
+      "img": "art/cast/grete.webp"
+    },
+    "clerk": {
+      "name": "协理",
+      "short": "协",
+      "hue": 265,
+      "shape": "tall",
+      "note": "公司协理，格里高尔的上司",
+      "img": "art/cast/clerk.webp"
+    },
+    "charwoman": {
+      "name": "老妇",
+      "short": "佣",
+      "hue": 210,
+      "shape": "broad",
+      "note": "钟点老妇，白发，大骨架",
+      "img": "art/cast/charwoman.webp"
+    },
+    "gregor": {
+      "name": "格里高尔",
+      "short": "兄",
+      "hue": 60,
+      "shape": "bent",
+      "note": "门后的人。全剧他从不作为角色发言——他的话只经旁白转述，立绘因此永不出现：门就是他的立绘。"
+    }
+  },
+  "scenes": [
+    {
+      "id": "s1",
+      "title": "第一场 · 六点三刻",
+      "bg": {
+        "c1": "#1c1712",
+        "c2": "#39301f",
+        "label": "萨姆沙家 · 走廊 · 清晨",
+        "img": "art/hall-morning.jpg"
+      },
+      "source": {
+        "loc": "第一章开篇",
+        "de": "Als Gregor Samsa eines Morgens aus unruhigen Träumen erwachte, fand er sich zu einem ungeheueren Ungeziefer verwandelt.",
+        "zh": "一天早晨，格里高尔·萨姆沙从不安的梦中醒来，发现自己变成了一只巨大的害虫。"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "雨点打在窗玻璃上。这套房子有三扇通往格里高尔先生房间的门，你跪在走廊里，擦第三扇门前的地板。"
+        },
+        {
+          "who": null,
+          "text": "你来这家做帮厨才几个月。规矩学得七七八八：六点生炉子，六点半摆早餐，先生的火车五点就该开走。"
+        },
+        {
+          "who": "me",
+          "text": "（今天先生的房门一直没响。）"
+        },
+        {
+          "who": "mother",
+          "mood": "soft",
+          "text": "格里高尔——六点三刻了。你不是要赶车吗？"
+        },
+        {
+          "who": null,
+          "text": "门后应了一声。那声音起初还像先生的，尾音里却混进一种压不住的、细细的吱叫，把每个字泡软了。"
+        },
+        {
+          "who": "father",
+          "mood": "hard",
+          "text": "格里高尔！格里高尔！怎么回事？"
+        },
+        {
+          "who": "grete",
+          "mood": "soft",
+          "text": "格里高尔？你不舒服吗？要什么东西吗？"
+        },
+        {
+          "who": null,
+          "text": "厨娘在厨房门口拽了拽你的围裙，把你拉回炉子边。"
+        },
+        {
+          "who": "koechin",
+          "mood": "tense",
+          "text": "手别停。听见那嗓子没有——你说，那是个什么动静？"
+        },
+        {
+          "choice": {
+            "prompt": "锅里的水开了。你说——",
+            "options": [
+              {
+                "text": "「兴许是着凉了。跑外勤的人，嗓子坏了常有的事。」",
+                "goto": "s2",
+                "u": {},
+                "source": {
+                  "loc": "第一章 · 格里高尔的自我安慰",
+                  "de": "Daß die Veränderung der Stimme nichts anderes war als der Vorbote einer tüchtigen Verkühlung…",
+                  "zh": "嗓音的变化不过是重感冒的前兆——他对此毫不怀疑。"
+                },
+                "echo": "门后的人，此刻也正这样安慰自己。"
+              },
+              {
+                "text": "「不像。着凉的嗓子是哑，这个……是里头多了一个声音。」",
+                "goto": "s2",
+                "u": {
+                  "gregor": 1
+                },
+                "source": {
+                  "loc": "第一章 · 嗓音的描写",
+                  "de": "…ein nicht zu unterdrückendes, schmerzliches Piepsen mischte…",
+                  "zh": "混进一种压不住的、痛苦的吱叫，字句刚出口是清楚的，回声里就碎了。"
+                },
+                "echo": "你听见了。全家都只当是感冒，你听见了。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "第二场 · 门铃",
+      "bg": {
+        "c1": "#191510",
+        "c2": "#33281c",
+        "label": "门厅与走廊 · 七点十分",
+        "img": "art/vestibule.jpg"
+      },
+      "source": {
+        "loc": "第一章 · 协理到访",
+        "de": "Aber dann ging natürlich wie immer das Dienstmädchen festen Schrittes zur Tür und öffnete.",
+        "zh": "然后，女仆当然还是像往常一样，迈着坚定的步子走去开了门。"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "七点十分，门铃响了。"
+        },
+        {
+          "who": null,
+          "text": "屋里安静了一瞬。谁都没动，好像不开门，门外的事就不存在。"
+        },
+        {
+          "who": null,
+          "text": "然后安娜理了理围裙，像往常一样，迈着坚定的步子走过去开了门。"
+        },
+        {
+          "who": "clerk",
+          "mood": "hard",
+          "text": "早上好，我找萨姆沙先生。——不，不必通报，他知道我为什么来。"
+        },
+        {
+          "who": null,
+          "text": "是公司的协理。为了一班误掉的火车，公司来的不是学徒，是协理本人。"
+        },
+        {
+          "who": "mother",
+          "mood": "tense",
+          "text": "他病了，协理先生，请您相信我。要不然格里高尔怎么会误车呢！这孩子脑子里除了公事什么都没有。"
+        },
+        {
+          "who": "clerk",
+          "mood": "hard",
+          "text": "萨姆沙先生，您把自己关在房里，只用是和不是回答，让您的父母担着天大的心，还——这只是顺带一提——旷废了公务。"
+        },
+        {
+          "who": "clerk",
+          "mood": "hard",
+          "text": "我一直以为您是个沉稳、明理的人。您最近的业绩本来就很不像话。"
+        },
+        {
+          "who": null,
+          "text": "门后突然滚出一长串话。每个字都糊成一团，只有急切是清楚的。"
+        },
+        {
+          "who": "clerk",
+          "mood": "tense",
+          "text": "……那是一个动物的声音。"
+        },
+        {
+          "who": "father",
+          "mood": "hard",
+          "text": "安娜！安娜！马上去叫锁匠来！"
+        },
+        {
+          "who": null,
+          "text": "喊声穿过门厅直冲厨房，两只手掌拍得脆响。可他喊的名字是安娜——安娜这会儿正站在门厅衣架边上。"
+        },
+        {
+          "who": null,
+          "text": "厨房里只有你和厨娘。厨娘看着你。原文只写了那个名字，没写谁动了。"
+        },
+        {
+          "choice": {
+            "prompt": "去叫锁匠的，得有一个人。",
+            "options": [
+              {
+                "text": "解下围裙就跑。锁匠铺在两条街外，你腿快。",
+                "goto": "s3a",
+                "u": {},
+                "source": {
+                  "loc": "第一章 · 父亲的呼喊",
+                  "de": "»Anna! Anna!« rief der Vater durch das Vorzimmer in die Küche, »sofort einen Schlosser holen!«",
+                  "zh": "「安娜！安娜！」父亲朝厨房喊，「马上去叫锁匠！」"
+                },
+                "echo": "两个姑娘裙子擦得沙沙响，冲出门去——原文里，前门就那样敞着。"
+              },
+              {
+                "text": "让安娜去。你守在走廊上——你想看着那扇门。",
+                "goto": "s3b",
+                "u": {},
+                "source": {
+                  "loc": "第一章 · 敞开的前门",
+                  "de": "…sie hatten sie wohl offen gelassen, wie es in Wohnungen zu sein pflegt, in denen ein großes Unglück geschehen ist.",
+                  "zh": "门就那样敞着——出了大祸的人家，常常这样。"
+                },
+                "echo": "你留下了。接下来的事，你会亲眼看见。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s3a",
+      "title": "第三场 · 两条街",
+      "bg": {
+        "c1": "#12151a",
+        "c2": "#2a2f38",
+        "label": "楼道与街道 · 雨",
+        "img": "art/stairwell-rain.jpg"
+      },
+      "source": {
+        "loc": "第一章 · 门开之后",
+        "de": "…da gab ihm der Vater von hinten einen erlösenden starken Stoß, und er flog, heftig blutend, weit in sein Zimmer hinein.",
+        "zh": "父亲从背后给了他解脱般的一记猛推，他血流不止地飞进了自己的房间深处。"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "锁匠铺的学徒磨磨蹭蹭找工具。你在雨里等，心跳得比跑的时候还快。"
+        },
+        {
+          "who": null,
+          "text": "等你带着锁匠爬上楼，公寓的前门大敞着——出了大祸的人家，门常常就这样敞着。"
+        },
+        {
+          "who": null,
+          "text": "门厅里已经乱了。协理不见了，只有楼梯间还荡着他的喊声。"
+        },
+        {
+          "who": null,
+          "text": "客厅里：咖啡壶倒了，咖啡还在往地毯上淌。太太瘫坐在打翻的早餐中间。"
+        },
+        {
+          "who": null,
+          "text": "老爷背对着你，手里攥着一根不属于他的手杖，胸口起伏。三扇门里靠左那扇关得死死的，门框上有一道新鲜的、褐色的痕。"
+        },
+        {
+          "who": "me",
+          "mood": "tense",
+          "text": "（你来晚了一步。中间发生了什么，这个家不会有人讲给你听。）"
+        },
+        {
+          "who": null,
+          "text": "锁匠在你身后站了一会儿，看了看那扇不再需要开的门，扛起工具箱走了。没人送他。"
+        },
+        {
+          "choice": {
+            "prompt": "椅子上搭着协理的帽子和大衣——手杖在老爷手里。楼梯间的脚步声还没散尽。",
+            "options": [
+              {
+                "text": "抓起帽子和大衣追下去，替这家人说一句：「先生是病了，求您在公司照实说。」",
+                "goto": "s4",
+                "u": {
+                  "gregor": 1
+                },
+                "source": {
+                  "loc": "第一章 · 协理落下的东西",
+                  "de": "…den Stock des Prokuristen, den dieser mit Hut und Überzieher auf einem Sessel zurückgelassen hatte…",
+                  "zh": "协理的手杖——他连同帽子和大衣一起落在了扶手椅上。"
+                },
+                "echo": "书里没有人追下去。你是第一个。"
+              },
+              {
+                "text": "把帽子大衣掸掸灰，挂上衣架。然后去扶太太。",
+                "goto": "s4",
+                "u": {},
+                "source": {
+                  "loc": "第一章 · 协理落下的东西",
+                  "de": "…den Stock des Prokuristen, den dieser mit Hut und Überzieher auf einem Sessel zurückgelassen hatte…",
+                  "zh": "协理的手杖——他连同帽子和大衣一起落在了扶手椅上。"
+                },
+                "echo": "书里，这些东西再没有被提起。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s3b",
+      "title": "第三场 · 门开了",
+      "bg": {
+        "c1": "#1a1410",
+        "c2": "#3b2417",
+        "label": "走廊 · 你看得见客厅的一角",
+        "img": "art/hall-dark.jpg"
+      },
+      "source": {
+        "loc": "第一章 · 驱赶",
+        "de": "Unerbittlich drängte der Vater und stieß Zischlaute aus, wie ein Wilder.",
+        "zh": "父亲毫不容情地逼过去，嘴里发出嘘嘘声，像个野人。"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "钥匙在锁孔里转了很久。不是手在转它——那声音又湿又钝，像牙齿咬着铁。"
+        },
+        {
+          "who": null,
+          "text": "门开了。"
+        },
+        {
+          "who": null,
+          "text": "你站在走廊拐角，只看得见客厅的一角：协理的手先捂住嘴，然后是整个人，一步一步往后退，像被什么无形的东西匀速推着。"
+        },
+        {
+          "who": "mother",
+          "mood": "tense",
+          "text": "救命——看在上帝份上，救命！"
+        },
+        {
+          "who": null,
+          "text": "你没有看清门里的东西。你只看见每一个看见它的人的脸。"
+        },
+        {
+          "who": null,
+          "text": "然后是奔逃的皮鞋声，楼梯间轰响。老爷抄起协理落下的手杖，左手抓起一份报纸，跺着脚往回赶什么——嘴里发出嘘嘘声，像个野人。"
+        },
+        {
+          "who": null,
+          "text": "一声闷响。左边那扇门被手杖捣上了。走廊突然静下来，静得能听见咖啡从桌沿滴到地毯上。"
+        },
+        {
+          "who": "me",
+          "mood": "tense",
+          "text": "（刚才，在协理退出来的那一瞬——门缝里有个影子，朝着人退去的方向，探了探。像是想跟上去解释什么。）"
+        },
+        {
+          "choice": {
+            "prompt": "太太瘫在打翻的早餐中间。老爷抵着门喘。安娜和小姐还没回来。",
+            "options": [
+              {
+                "text": "跑下楼追协理，把帽子大衣还他：「先生是病了，求您在公司照实说。」",
+                "goto": "s4",
+                "u": {
+                  "gregor": 1
+                },
+                "source": {
+                  "loc": "第一章 · 协理落下的东西",
+                  "de": "…den Stock des Prokuristen, den dieser mit Hut und Überzieher auf einem Sessel zurückgelassen hatte…",
+                  "zh": "协理的手杖——他连同帽子和大衣一起落在了扶手椅上。"
+                },
+                "echo": "书里没有人替门后的人对外说过一个字。"
+              },
+              {
+                "text": "去扶太太。外面的事，轮不到你。",
+                "goto": "s4",
+                "u": {},
+                "source": {
+                  "loc": "第一章 · 协理落下的东西",
+                  "de": "…den Stock des Prokuristen, den dieser mit Hut und Überzieher auf einem Sessel zurückgelassen hatte…",
+                  "zh": "协理的手杖——他连同帽子和大衣一起落在了扶手椅上。"
+                },
+                "echo": "你扶起了太太。门后的动静，慢慢停了。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "第四场 · 一刻钟",
+      "bg": {
+        "c1": "#14110d",
+        "c2": "#241d14",
+        "label": "厨房 · 当天深夜",
+        "img": "art/kitchen-night.jpg"
+      },
+      "source": {
+        "loc": "第二章 · 第一天",
+        "de": "Auch hatte das Dienstmädchen gleich am ersten Tag kniefällig die Mutter gebeten, sie sofort zu entlassen…",
+        "zh": "还在第一天，女仆就跪着求太太立刻辞退她。"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "夜里的厨房只点一盏灯。安娜的包袱已经系好了，放在膝盖上。"
+        },
+        {
+          "who": "anna",
+          "mood": "tense",
+          "text": "我跪也跪了。太太答应了。一刻钟后我就走。"
+        },
+        {
+          "who": null,
+          "text": "方才她真的跪下去了——跪着求人辞退自己，含着泪道谢，像领受了这家最大的一桩恩典。"
+        },
+        {
+          "who": "anna",
+          "mood": "soft",
+          "text": "我还起了誓：这家里的事，一个字也不往外说。没人要我起誓，是我自己要起的。"
+        },
+        {
+          "who": null,
+          "text": "厨娘没说话，在擦一只已经干净的锅。炉膛里的火塌下去一块。"
+        },
+        {
+          "who": "anna",
+          "mood": "soft",
+          "text": "丫头，跟我走吧。你才十六。这家里出的事，连名字都不能提——你留下能有什么好？"
+        },
+        {
+          "choice": {
+            "prompt": "包袱就在桌上，再打一个并不费事。",
+            "options": [
+              {
+                "text": "跟安娜走。今晚就走。",
+                "goto": "end-early",
+                "u": {},
+                "source": {
+                  "loc": "第二章 · 可怕的誓言",
+                  "de": "…gab, ohne daß man es von ihr verlangte, einen fürchterlichen Schwur ab, niemandem auch nur das geringste zu verraten.",
+                  "zh": "没人要求，她自己发下重誓：一丁点也不对任何人透露。"
+                },
+                "echo": "原著里，走的人是这样走的。"
+              },
+              {
+                "text": "留下。「总得有人生炉子。再说……我想知道那扇门后面，后来怎么样了。」",
+                "goto": "s4b",
+                "u": {
+                  "grete": 1
+                },
+                "source": {
+                  "loc": "第二章 · 留下的人",
+                  "de": "…dieses etwa sechzehnjährige Mädchen harrte zwar tapfer aus…",
+                  "zh": "这个约十六岁的女孩勇敢地坚持留了下来。"
+                },
+                "echo": "原文给你的形容词只有一个：勇敢。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s4b",
+      "title": "第四场 · 续 · 你开口求一件事",
+      "bg": {
+        "c1": "#14110d",
+        "c2": "#241d14",
+        "label": "厨房 · 同夜更深",
+        "img": "art/kitchen-night.jpg"
+      },
+      "source": {
+        "loc": "第二章 · 十六岁女孩的请求",
+        "de": "…hatte aber um die Vergünstigung gebeten, die Küche unaufhörlich versperrt halten zu dürfen und nur auf besonderen Anruf öffnen zu müssen.",
+        "zh": "但她求了一项恩准：允许厨房始终锁着，只在特别唤她时才开门。"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "送走安娜，太太扶着门框站了一会儿。哮喘让她的呼吸像隔着一层布。"
+        },
+        {
+          "who": "mother",
+          "mood": "soft",
+          "text": "孩子……你当真不走？"
+        },
+        {
+          "who": null,
+          "text": "太太没说的是：家里的开销一天紧过一天，厨娘也留不了多久了。这个厨房，早晚是你一个人的。"
+        },
+        {
+          "who": null,
+          "text": "在原著里，留下来的女孩向太太求了一项恩准。现在轮到你开口。"
+        },
+        {
+          "choice": {
+            "prompt": "你说：「太太，我留下。只是求您准我一件事——」",
+            "options": [
+              {
+                "text": "「准我把厨房一直锁着。除非您特意唤我，我不开门。」",
+                "goto": "s5a",
+                "u": {},
+                "source": {
+                  "loc": "第二章 · 十六岁女孩的请求",
+                  "de": "…die Küche unaufhörlich versperrt halten zu dürfen und nur auf besonderen Anruf öffnen zu müssen.",
+                  "zh": "允许厨房始终锁着，只在特别唤她时才开门。"
+                },
+                "echo": "这是原著里你唯一主动做的事：把自己锁起来，不看。"
+              },
+              {
+                "text": "「……不，没什么可求的。厨房门，我就不锁了。」",
+                "goto": "s5b",
+                "u": {
+                  "gregor": 1
+                },
+                "source": {
+                  "loc": "第二章 · 十六岁女孩的请求——她本可以不锁",
+                  "de": "…die Küche unaufhörlich versperrt halten zu dürfen…",
+                  "zh": "（原文中她求的是把门锁上。你把这句话倒了过来。）"
+                },
+                "echo": "从这一刻起，你离开了书页。门开着。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s5a",
+      "title": "第五场 · 支开",
+      "bg": {
+        "c1": "#151713",
+        "c2": "#262b21",
+        "label": "后楼梯与厨房 · 两周后",
+        "img": "art/backstairs.jpg"
+      },
+      "source": {
+        "loc": "第二章 · 送饭的规矩",
+        "de": "…und das Dienstmädchen wurde von der Schwester mit irgendeiner Besorgung weggeschickt.",
+        "zh": "而女仆总被小姐用随便什么差事支开。"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "两周了。这个家长出一套新的钟表：清早一次，午后一次，小姐进那间屋子。每到那时，你就被支出门——买线，取报纸，随便什么。"
+        },
+        {
+          "who": null,
+          "text": "今天的差事是半磅咖啡。铺子没开门，你回来得早了。"
+        },
+        {
+          "who": null,
+          "text": "后楼梯上，你撞见小姐端着一张旧报纸出来——报纸上摊着的不是剩饭：半烂的菜叶，晚餐剩下的、裹着凝硬白酱的骨头，一块两天前先生还嫌难吃的奶酪。"
+        },
+        {
+          "who": null,
+          "text": "她用一块破布垫着手去捡空了的盘子，不用手碰。看见你，她站住了。眼圈是红的，人却把下巴抬了起来。"
+        },
+        {
+          "who": "grete",
+          "mood": "tense",
+          "text": "……咖啡呢？"
+        },
+        {
+          "choice": {
+            "prompt": "楼道很窄，你们隔着一步。",
+            "options": [
+              {
+                "text": "低头让开：「铺子没开，我再跑一趟。」——只当什么都没看见。",
+                "goto": "s6",
+                "u": {
+                  "grete": 1
+                },
+                "source": {
+                  "loc": "第三章 · 她的领地",
+                  "de": "…darüber, daß das Aufräumen von Gregors Zimmer ihr vorbehalten blieb.",
+                  "zh": "收拾格里高尔的房间，是保留给她一个人的事。"
+                },
+                "echo": "她要的是没人看见。你给了她。"
+              },
+              {
+                "text": "轻声说：「灶上有我留的一碗干净肉汤。要不……给里面那位换换口味？」",
+                "goto": "s6",
+                "u": {
+                  "gregor": 1,
+                  "grete": -1
+                },
+                "source": {
+                  "loc": "第二章 · 试口味的食物",
+                  "de": "Da war altes halbverfaultes Gemüse; Knochen vom Nachtmahl her…",
+                  "zh": "半烂的陈菜；晚餐剩下的骨头，凝着变硬的白酱。"
+                },
+                "echo": "她的下巴垂下去一分。「他现在……不吃新鲜的。」她说完就后悔了。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s5b",
+      "title": "第五场 · 没锁的门",
+      "bg": {
+        "c1": "#151713",
+        "c2": "#262b21",
+        "label": "厨房 · 门缝 · 两周后",
+        "img": "art/kitchen-dusk.jpg"
+      },
+      "source": {
+        "loc": "第二章 · 送饭的规矩",
+        "de": "…und das Dienstmädchen wurde von der Schwester mit irgendeiner Besorgung weggeschickt.",
+        "zh": "而女仆总被小姐用随便什么差事支开。"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "两周了。你的厨房门不上锁。没人说破这件事，但每到送饭的钟点，小姐会先支你出门——今天的差事是半磅咖啡，你说铺子午后才开。"
+        },
+        {
+          "who": null,
+          "text": "于是你在。门缝里，你看见她怎么备那份「饭」：一张旧报纸，摊开半烂的菜叶、裹着白酱的骨头、一块先生两天前还嫌弃的奶酪。"
+        },
+        {
+          "who": null,
+          "text": "全是馊的。她挑得很认真。"
+        },
+        {
+          "who": null,
+          "text": "她进那间屋子从不空手，出来时永远先开窗，扑到窗边深深吸气，像刚从水底浮上来。"
+        },
+        {
+          "who": "grete",
+          "mood": "tense",
+          "text": "（她出来了。破布垫着手，端着空盘子。看见你的门开着，她站住了。）"
+        },
+        {
+          "choice": {
+            "prompt": "隔着半开的厨房门，她看着你，你看着那只空盘子。",
+            "options": [
+              {
+                "text": "把门轻轻带上。她的事，当作没看见。",
+                "goto": "s6",
+                "u": {
+                  "grete": 1
+                },
+                "source": {
+                  "loc": "第三章 · 她的领地",
+                  "de": "…darüber, daß das Aufräumen von Gregors Zimmer ihr vorbehalten blieb.",
+                  "zh": "收拾格里高尔的房间，是保留给她一个人的事。"
+                },
+                "echo": "门合上前，你看见她松了一口气。"
+              },
+              {
+                "text": "把门全推开：「灶上有碗干净肉汤。他从前……不是顿顿都爱吃剩的。」",
+                "goto": "s6",
+                "u": {
+                  "gregor": 1,
+                  "grete": -1
+                },
+                "source": {
+                  "loc": "第二章 · 试口味的食物",
+                  "de": "Da war altes halbverfaultes Gemüse; Knochen vom Nachtmahl her…",
+                  "zh": "半烂的陈菜；晚餐剩下的骨头，凝着变硬的白酱。"
+                },
+                "echo": "「他现在只吃这些。」她说。可她端汤的手，比端盘子稳。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s6",
+      "title": "第六场 · 三秒钟",
+      "bg": {
+        "c1": "#141014",
+        "c2": "#2b1f27",
+        "label": "厨房门口 · 约一个月后",
+        "img": "art/kitchen-dusk.jpg"
+      },
+      "source": {
+        "loc": "第二章 · 搬家具",
+        "de": "…den Vater wagte sie nicht um Hilfe zu bitten; das Dienstmädchen hätte ihr ganz gewiß nicht geholfen…",
+        "zh": "她不敢求父亲帮忙；女仆是肯定不会帮她的。"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "先生房里的动静变了：夜里有细碎的沙沙声爬过墙壁，爬过天花板。你往炉子里添柴，只当没听见。"
+        },
+        {
+          "who": null,
+          "text": "今天老爷不在家。小姐要把那间屋子的家具搬空——让里面的东西爬得开一些。"
+        },
+        {
+          "who": null,
+          "text": "她在厨房门口站住了。话到嘴边，停了三秒。"
+        },
+        {
+          "who": "grete",
+          "mood": "tense",
+          "text": "……没什么。"
+        },
+        {
+          "who": null,
+          "text": "她转身去找了太太。原文在这里写得很硬：她不敢求父亲；女仆，是肯定不会帮的。"
+        },
+        {
+          "choice": {
+            "prompt": "两个女人搬不动一只五斗柜。走廊里已经响起挪动声。",
+            "options": [
+              {
+                "text": "解下围裙追出去：「小姐，我来搭把手。」",
+                "goto": "s6b",
+                "u": {
+                  "grete": 1,
+                  "mother": 1
+                },
+                "source": {
+                  "loc": "第二章 · 搬家具",
+                  "de": "…das Dienstmädchen hätte ihr ganz gewiß nicht geholfen…",
+                  "zh": "女仆是肯定不会帮她的。（原文如此断言。你偏要帮。）"
+                },
+                "echo": "「肯定不会帮」——你把原文的这五个字撕掉了。"
+              },
+              {
+                "text": "没动。炉子上还坐着汤。这个家的事，你已经看得够多了。",
+                "goto": "s6a",
+                "u": {},
+                "source": {
+                  "loc": "第二章 · 搬家具",
+                  "de": "…das Dienstmädchen hätte ihr ganz gewiß nicht geholfen…",
+                  "zh": "女仆是肯定不会帮她的。"
+                },
+                "echo": "原文写对了你。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s6a",
+      "title": "第六场 · 续 · 隔着一扇门",
+      "bg": {
+        "c1": "#120f0e",
+        "c2": "#241a18",
+        "label": "厨房 · 同日黄昏",
+        "img": "art/kitchen-dusk.jpg"
+      },
+      "source": {
+        "loc": "第二章 · 门铃",
+        "de": "Da läutete es. Das Mädchen war natürlich in ihrer Küche eingesperrt und Grete mußte daher öffnen gehen.",
+        "zh": "这时门铃响了。女孩当然锁在她的厨房里，只好由葛蕾特去开门。"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "整个下午，墙那边都是家具腿刮地板的声音。然后，一声长长的、不像人的尖叫。再然后是玻璃碎裂。"
+        },
+        {
+          "who": null,
+          "text": "你在厨房里，手按在门闩上，没有拉开。"
+        },
+        {
+          "who": null,
+          "text": "门铃响了。是老爷回来了。你当然在厨房里——去开门的只能是小姐。"
+        },
+        {
+          "who": "father",
+          "mood": "hard",
+          "text": "我早料到会这样。我早就说过。你们这些女人就是不听。"
+        },
+        {
+          "who": null,
+          "text": "接下来的声音，你这辈子都认得：跺脚，嘘声——然后是什么小而硬的东西，一颗、又一颗，砸在木头上，砸进别的什么里。"
+        },
+        {
+          "who": null,
+          "text": "厨娘上个月也被辞退了。这一次，厨房里只有你一个人，和门闩上你自己的手。是苹果——碗柜上果盘里那种小红苹果。"
+        },
+        {
+          "choice": {
+            "prompt": "隔着门，你听着那个扔苹果的人。",
+            "options": [
+              {
+                "text": "（他在发狂。一家之主在惩罚那个毁掉一切的东西。）",
+                "goto": "s7",
+                "u": {},
+                "source": {
+                  "loc": "第二章 · 苹果",
+                  "de": "…denn der Vater hatte sich entschlossen, ihn zu bombardieren.",
+                  "zh": "因为父亲已经下定决心：轰炸他。"
+                },
+                "echo": "「轰炸」——原文用的是打仗的词。"
+              },
+              {
+                "text": "（不对。跺脚和嘘声是不敢靠近的人才有的。他在怕。）",
+                "goto": "s7",
+                "u": {
+                  "father": 1
+                },
+                "source": {
+                  "loc": "第一章 · 嘘声",
+                  "de": "Unerbittlich drängte der Vater und stieß Zischlaute aus, wie ein Wilder.",
+                  "zh": "父亲毫不容情地逼过去，发出嘘嘘声，像个野人。"
+                },
+                "echo": "人只对自己不敢碰的东西发嘘声。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s6b",
+      "title": "第六场 · 续 · 你进了那间屋子",
+      "bg": {
+        "c1": "#120f0e",
+        "c2": "#241a18",
+        "label": "格里高尔的房间 · 同日黄昏",
+        "img": "art/room.jpg"
+      },
+      "source": {
+        "loc": "第二章 · 搬家具",
+        "de": "…das Dienstmädchen hätte ihr ganz gewiß nicht geholfen…",
+        "zh": "女仆是肯定不会帮她的。（这一场，原文没有写。）"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "屋里比你擦地那会儿空了，也暗了。墙纸上的花沿着墙角爬。你和太太抬五斗柜的两头，小姐指挥。"
+        },
+        {
+          "who": "mother",
+          "mood": "soft",
+          "text": "……还是把家具留下吧。搬空了，倒像是我们摆明了不抱指望，由着他自生自灭。"
+        },
+        {
+          "who": "mother",
+          "mood": "soft",
+          "text": "让屋子保持老样子，等格里高尔回到我们身边，就能发现一切如旧——把中间这段日子，忘得容易些。"
+        },
+        {
+          "who": null,
+          "text": "小姐不肯。柜子最终还是出了门。你回头去搬写字台的时候，看见了墙上那幅镶金框的画——和画上趴着的、护着它的东西。"
+        },
+        {
+          "who": null,
+          "text": "你没有叫。你看见它蜷起来往玻璃上贴了贴，像人往大衣里缩了缩。"
+        },
+        {
+          "who": null,
+          "text": "叫出声的是太太。她先看见花墙纸上那团巨大的褐色，然后才明白那是什么。她昏过去的时候，你接住了她半边身子。"
+        },
+        {
+          "who": null,
+          "text": "后来的事很乱：小姐去拿药水，瓶子碎了一只，门摔上了。门铃响起时，是你去开的——老爷回来了，你退回厨房。然后你听见了苹果。"
+        },
+        {
+          "choice": {
+            "prompt": "门缝里，你看见老爷把果盘里的小红苹果一颗颗装满口袋。",
+            "options": [
+              {
+                "text": "（他在发狂。一家之主在惩罚那个毁掉一切的东西。）",
+                "goto": "s7",
+                "u": {},
+                "source": {
+                  "loc": "第二章 · 苹果",
+                  "de": "…denn der Vater hatte sich entschlossen, ihn zu bombardieren.",
+                  "zh": "因为父亲已经下定决心：轰炸他。"
+                },
+                "echo": "「轰炸」——原文用的是打仗的词。"
+              },
+              {
+                "text": "（装口袋的手在抖。他不敢靠近，才用扔的。他在怕。）",
+                "goto": "s7",
+                "u": {
+                  "father": 1
+                },
+                "source": {
+                  "loc": "第一章 · 嘘声",
+                  "de": "Unerbittlich drängte der Vater und stieß Zischlaute aus, wie ein Wilder.",
+                  "zh": "父亲毫不容情地逼过去，发出嘘嘘声，像个野人。"
+                },
+                "echo": "人只对自己不敢碰的东西发嘘声。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s7",
+      "title": "第七场 · 工钱",
+      "bg": {
+        "c1": "#100e0c",
+        "c2": "#1e1a15",
+        "label": "门厅 · 又一个多月后",
+        "img": "art/vestibule-dusk.jpg"
+      },
+      "source": {
+        "loc": "第三章 · 辞退",
+        "de": "Der Haushalt wurde immer mehr eingeschränkt; das Dienstmädchen wurde nun doch entlassen…",
+        "zh": "家用一再缩减；女仆终究还是被辞退了。"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "苹果之后的日子，这个家换了一副骨头。老爷穿着银行杂役的制服在椅子上睡着，制服从不脱下。太太伏在灯下给成衣铺缝细活。小姐白天站柜台，夜里学速记和法语。"
+        },
+        {
+          "who": null,
+          "text": "厨娘早走了。三个留大胡子的房客住进了原先的卧室。而先生房里那道伤，你换床单时闻得到——苹果就烂在他背上，没人敢去取。"
+        },
+        {
+          "who": null,
+          "text": "今天早上，太太在门厅等你，手里是一只数好的信封，和一封很短的荐书。"
+        },
+        {
+          "who": "mother",
+          "mood": "soft",
+          "text": "孩子，家里……雇不起了。往后重活，早晚来个钟点老妇做。荐书上我写了：你手脚干净，嘴也严。"
+        },
+        {
+          "who": null,
+          "text": "接替你的老妇已经来看过一趟了：白发在头上乱飞，骨架大得堵门。她朝里间努了努嘴，问的是：「那个么，往后咋弄？」"
+        },
+        {
+          "who": null,
+          "text": "太太把信封放进你手里，替你把围裙带子解了。这个动作她做得很慢。"
+        },
+        {
+          "choice": {
+            "prompt": "门开着。楼梯就在脚下。你转过身——",
+            "options": [
+              {
+                "text": "行个屈膝礼：「太太保重。」别的什么也没说。",
+                "goto": "s8",
+                "u": {},
+                "source": {
+                  "loc": "第三章 · 辞退",
+                  "de": "…das Dienstmädchen wurde nun doch entlassen…",
+                  "zh": "女仆终究还是被辞退了。（原文里，她走时没有留下一句话。）"
+                },
+                "echo": "你走得和书里一样安静。"
+              },
+              {
+                "text": "行礼，然后抬头：「太太——里屋那位，还是格里高尔先生。您唤他名字，他是懂的。」",
+                "goto": "s8",
+                "u": {
+                  "gregor": 1,
+                  "mother": 1
+                },
+                "source": {
+                  "loc": "第三章 · 全家的读法",
+                  "de": "»Weg muß es,« rief die Schwester, »du mußt bloß den Gedanken loszuwerden suchen, daß es Gregor ist.«",
+                  "zh": "「它必须走，」妹妹喊道，「您只需想法子丢开一个念头：那是格里高尔。」"
+                },
+                "echo": "这句话，全书等了三章，没有一个人说。你说了。"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "s8",
+      "title": "尾声 · 三月末",
+      "bg": {
+        "c1": "#181b1e",
+        "c2": "#3a4147",
+        "label": "萨姆沙家 · 几个月后 · 一个晴朗的早晨",
+        "img": "art/spring.jpg"
+      },
+      "source": {
+        "loc": "第三章 · 那个早晨（这一天你在场，是书页之外的事；这一天发生的每件事，都是书里的）",
+        "de": "»Sehen Sie nur mal an, es ist krepiert; da liegt es, ganz und gar krepiert!«",
+        "zh": "「你们快来瞧啊，它断气了；躺在那儿，完完全全断气了！」"
+      },
+      "lines": [
+        {
+          "who": null,
+          "text": "三月末。你在新东家攒下了半季工钱，回来取太太答应补的那半个月——也许，也是想再看一眼那三扇门。"
+        },
+        {
+          "who": null,
+          "text": "开门的是那个白发老妇。今天这家的窗子全开着，风是温的，带着潮气。"
+        },
+        {
+          "who": "charwoman",
+          "mood": "calm",
+          "text": "哟，是先头那丫头。来得巧，今儿这家里——嗐，你自己听吧。"
+        },
+        {
+          "who": null,
+          "text": "门厅里过来三个大胡子，拎着帽子和手杖，一言不发往楼下走。老爷站在他们身后，制服笔挺，手指着门。"
+        },
+        {
+          "who": null,
+          "text": "客厅桌上摊着三封告假信：老爷一封给行里，太太一封给主顾，小姐一封给商号。三个人都在写，谁也没抬头。"
+        },
+        {
+          "who": "charwoman",
+          "mood": "calm",
+          "text": "隔壁那玩意儿，你们不用操心怎么弄走了。已经妥了。"
+        },
+        {
+          "who": null,
+          "text": "老爷抬起一只手，止住了她往下讲。老妇撇撇嘴，冲你挤了挤眼，摔上门走了。门响得整层楼都听见。"
+        },
+        {
+          "who": "father",
+          "mood": "hard",
+          "text": "今晚就辞了她。"
+        },
+        {
+          "who": null,
+          "text": "你顺着走廊走到头。左边那扇门开着：屋里空的，扫得很净，窗子大开。三月的风把窗帘掀起来，又放下。"
+        },
+        {
+          "who": "me",
+          "mood": "soft",
+          "text": "（地板上有一小块颜色比别处深。除此之外，什么都不剩了。）"
+        },
+        {
+          "who": null,
+          "text": "太太拿着信封追出来，塞进你手里。她看着你，嘴唇动了动，像那天解你围裙带子时一样慢。"
+        },
+        {
+          "choice": {
+            "prompt": "楼下电车叮叮当当。他们一家今天要进城外的公园去——这个家几个月来头一次一起出门。",
+            "options": [
+              {
+                "text": "接过信封，屈膝，转身下楼。这个家的事，从此与你无关。",
+                "goto": "end-canon",
+                "u": {},
+                "source": {
+                  "loc": "第三章 · 结尾",
+                  "de": "…die Tochter als erste sich erhob und ihren jungen Körper dehnte.",
+                  "zh": "到站时，女儿第一个站起身，舒展她年轻的身体。"
+                },
+                "echo": "书就要在没有你的地方合上了。"
+              },
+              {
+                "text": "接过信封，抬头轻声问：「太太——他走的时候，不疼了吧？」",
+                "goto": "end-witness",
+                "u": {
+                  "gregor": 1
+                },
+                "source": {
+                  "loc": "第三章 · 他的最后一夜",
+                  "de": "…aber ihm war, als würden sie allmählich schwächer und schwächer und würden schließlich ganz vergehen.",
+                  "zh": "他觉得那疼痛似乎正一点点减弱，终将完全消失。"
+                },
+                "echo": "这个问题，书里写了答案，却没有人问过。"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "endings": [
+    {
+      "id": "end-early",
+      "canon": false,
+      "title": "提前合上的书",
+      "lines": [
+        {
+          "who": null,
+          "text": "你和安娜连夜出的城。新东家在河对岸，活不重，只是每天开饭前，你会想起一扇没等到早饭的门。"
+        },
+        {
+          "who": null,
+          "text": "第二年开春，你听旧街坊说，萨姆沙家搬走了，房子退了，儿子——没人说得清儿子的事。安娜到死都守着那个誓。"
+        },
+        {
+          "who": null,
+          "text": "你没看见的那几个月，书替你记着。哪一天你翻开它，就从你走掉的那一页读起。"
+        }
+      ],
+      "source": {
+        "loc": "第二章 · 可怕的誓言",
+        "de": "…einen fürchterlichen Schwur ab, niemandem auch nur das geringste zu verraten.",
+        "zh": "发下重誓：一丁点也不对任何人透露。"
+      }
+    },
+    {
+      "id": "end-canon",
+      "canon": true,
+      "title": "书页合上的地方",
+      "lines": [
+        {
+          "who": null,
+          "text": "你下了楼，走进三月的太阳里。身后那家人锁了门，去赶开往城外的电车。"
+        },
+        {
+          "who": null,
+          "text": "车厢里洒满暖洋洋的阳光，只坐着他们三个。他们谈起往后的日子，觉得细看起来并不坏：三份差事都还体面，往后该换一套小些的、房租便宜些的住处。"
+        },
+        {
+          "who": null,
+          "text": "两位老人看着越说越有生气的女儿，几乎同时想到：是该给她寻一个好人家了。"
+        },
+        {
+          "who": null,
+          "text": "到站时，女儿第一个站起身，舒展她年轻的身体。"
+        },
+        {
+          "who": null,
+          "text": "——书在这里合上。你走在另一条街上，口袋里是数好的工钱。你没有回头，像书里写的那样。"
+        }
+      ],
+      "source": {
+        "loc": "第三章 · 全书最后一句",
+        "de": "…als am Ziele ihrer Fahrt die Tochter als erste sich erhob und ihren jungen Körper dehnte.",
+        "zh": "到站时，女儿第一个站起身，舒展她年轻的身体。"
+      }
+    },
+    {
+      "id": "end-witness",
+      "canon": false,
+      "title": "有人问过一句",
+      "lines": [
+        {
+          "who": "mother",
+          "mood": "soft",
+          "text": "……疼？"
+        },
+        {
+          "who": null,
+          "text": "太太握着门把，站了很久。哮喘让她的呼吸像隔着一层布，但这一次，不全是哮喘。"
+        },
+        {
+          "who": "mother",
+          "mood": "soft",
+          "text": "大夫说……那样干瘦，是很久没有吃东西了。我想——我想走的时候，是不疼了。"
+        },
+        {
+          "who": "mother",
+          "mood": "soft",
+          "text": "谢谢你，孩子。这几个月，这个家里……谢谢你还拿他当他。"
+        },
+        {
+          "who": null,
+          "text": "楼下电车叮叮当当。他们一家还是去了城外，阳光还是暖的，女儿还是第一个站起来舒展了年轻的身体。书里的每一个字，都没有因为你而改动。"
+        },
+        {
+          "who": null,
+          "text": "只有一件事不一样，而书没有地方写它：在这个故事的某一条缝里，有人问过他疼不疼。"
+        }
+      ],
+      "source": {
+        "loc": "第三章 · 他的最后一夜",
+        "de": "…aber ihm war, als würden sie allmählich schwächer und schwächer und würden schließlich ganz vergehen.",
+        "zh": "他觉得那疼痛似乎正一点点减弱，终将完全消失。"
+      }
+    }
+  ],
+  "verdict": {
+    "gregor": {
+      "bands": [
+        {
+          "min": -9,
+          "max": 0,
+          "text": "对你来说，门后从头到尾是「那东西」。这也是这家人的读法——你和他们，读的是同一本书。"
+        },
+        {
+          "min": 1,
+          "max": 2,
+          "text": "你听出过那不是感冒，也许还留过一碗干净的汤。但直到最后，你没有说出那个名字。这本书你读了一半。"
+        },
+        {
+          "min": 3,
+          "max": 9,
+          "text": "从第一声吱叫起，你就知道门后的不是虫，是格里高尔。全书没有第二个人做到这件事——包括他的家人。"
+        }
+      ]
+    },
+    "grete": {
+      "bands": [
+        {
+          "min": -9,
+          "max": 0,
+          "text": "你把葛蕾特当成圣女，或者当成叛徒。都错了。她只是一个被留在原地的十七岁的人。"
+        },
+        {
+          "min": 1,
+          "max": 2,
+          "text": "你看见了她的累，也给过她体面。但她最锋利的那一面，你别过头去了。"
+        },
+        {
+          "min": 3,
+          "max": 9,
+          "text": "你读懂了全书最冷的一行：最先说出「它必须走」的，是最爱过他的那个人。而她只有十七岁，这不全是她的错。"
+        }
+      ]
+    },
+    "mother": {
+      "bands": [
+        {
+          "min": -9,
+          "max": 0,
+          "text": "你以为太太只是软弱。你忘了她说过：把家具留下，他会回来的。"
+        },
+        {
+          "min": 1,
+          "max": 9,
+          "text": "你记得她是这个家里最后一个不肯改口的人——哪怕改口的那天，她也没有亲手推过一件家具。"
+        }
+      ]
+    },
+    "father": {
+      "bands": [
+        {
+          "min": -9,
+          "max": 0,
+          "text": "你只看见了手杖、制服和苹果。"
+        },
+        {
+          "min": 1,
+          "max": 9,
+          "text": "你听懂了那嘘声：一个破产过一次的人，对着自己不敢碰的东西虚张声势。恐惧穿上制服，就成了威严。"
+        }
+      ]
+    }
+  }
+}

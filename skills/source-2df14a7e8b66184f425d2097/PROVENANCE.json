@@ -1,0 +1,6 @@
+{
+  "repository": "jfrog/claude-plugin",
+  "ref": "9b1f8f6c883522a87502e5155abd593a8befe3c5",
+  "path": "skills/jfrog-init/SKILL.md",
+  "source": "https://github.com/jfrog/claude-plugin.git"
+}

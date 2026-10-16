@@ -1,0 +1,6 @@
+{
+  "repository": "stripe/ai",
+  "ref": "97b2164821c378f246c3903852057b36a8bd0296",
+  "path": "providers/claude/plugin/skills/connect-recommend/SKILL.md",
+  "source": "https://github.com/stripe/ai.git"
+}

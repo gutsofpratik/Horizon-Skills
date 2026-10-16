@@ -1,0 +1,6 @@
+{
+  "repository": "callstackincubator/agent-skills",
+  "ref": "default",
+  "path": "skills/writing-user-docs/SKILL.md",
+  "source": "https://github.com/callstackincubator/agent-skills"
+}

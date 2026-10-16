@@ -1,0 +1,305 @@
+# Steps 1, 1.5, and 2 — resolve the firm, confirm ManCo eligibility, and resolve its ManCo entity over MCP (BUILD path)
+
+Reached only when Step 0.2 classified a **MISS**, or `<FORCE_REFRESH>` was set.
+A warm or soft cache hit skips all three of these steps entirely — see
+[firm-resolution.md](firm-resolution.md), which owns Gate 0 and Step 0 and
+routes here.
+
+> Steps referenced here that are documented elsewhere: **Gate 0 / Step 0** → [firm-resolution.md](firm-resolution.md); **Step 2.5 / Step 2.75** → [budget-ingest.md](budget-ingest.md); **Step 3** → [data-fetch.md](data-fetch.md).
+
+## Step 1 — Resolve firm via list_contexts (SILENT — BUILD path only)
+
+Reached only when Step 0.2 classified a **MISS**, or `<FORCE_REFRESH>` was
+set. A WARM HIT and a soft hit both skip this step and Step 2 entirely —
+each already holds the firm and the entity from a previous build, and a
+soft hit differs only in that its DATA needs refreshing.
+
+Identify the Carta MCP server by prefix — scan the tools connected in this
+session for any `mcp__<SERVER>__list_contexts` (equivalently, `read_tool` /
+`set_context` under the same prefix). Most sessions surface one of
+`claude_ai_Carta`, `carta_production`, or `carta`, but treat those three as
+examples, not the whole set — a connector can be namespaced under any name,
+including an opaque generated ID (Claude Desktop exposes Carta as a
+claude.ai connector this way instead of a friendly name). Because this scan
+runs at the top level of the skill, not inside a dispatched subagent, any
+connected name works the same way — there's no closed allowlist to update
+by hand when a new connector ID shows up. Use whichever prefix you find as
+`<SERVER>` for every tool call in this step and after. Do **not** call
+`welcome` to identify the server — it's not needed, and its response
+renders as a widget.
+
+If nothing matches, break silence with one plain sentence: *"The Carta Fund
+Admin MCP needs to be authorized in this session — run `/mcp` and reconnect
+the Carta connector, then re-invoke this skill."* Then stop.
+
+If **two or more** distinct prefixes have connected tools at the same time, don't
+silently pick one — ask via a single `AskUserQuestion`, listing the live prefixes as
+options:
+
+> "I see more than one Carta MCP connector active right now (`<PREFIX_A>`,
+> `<PREFIX_B>`, ...). Which one should this session use?"
+
+Default to `carta` if the user has no strong preference, or if asking would be
+disruptive (e.g. no interactive turn is available to wait on). Once resolved — by
+answer or by default — use that prefix as `<SERVER>` for every tool call in this step
+and after.
+
+**Meta-tools are never routed through `read_tool` or `call_tool`.** `list_contexts`, `set_context`,
+`search_tools`, `discover`, `get_current_user`, and `welcome` are each their own
+top-level tool under `<SERVER>` — call them directly, e.g. `mcp__<SERVER>__list_contexts(...)`.
+Never pass one of their names into `read_tool(name="list_contexts", ...)` or
+`read_tool(name="search_tools", ...)` — the proxies' registry only holds Fund
+Admin/DWH domain commands (`fa__...`, `dwh__execute__query`), so a meta-tool name
+sent through it comes back `Unknown tool`, and `search_tools` sent through it comes
+back refusing the call outright ("synthetic search tool and cannot be called via the
+read_tool proxy"). If a **direct** call to one of these meta-tools itself comes back
+`Unknown tool`, the fix is to re-check `<SERVER>` above — not to retry the same name
+through `read_tool` or `call_tool`.
+
+**Classify `<CARTA_ENVIRONMENT>` from `<SERVER>`'s name** — served to the
+dashboard's Snowplow tracker so nonprod usage isn't misattributed as
+production. A name containing `test`/`sandbox`/`demo`/`preprod`/
+`preproduction` (case-insensitive) → `"nonprod"`. Everything else — `carta`,
+`carta_production`, any other name, or an opaque UUID — → `"production"`
+(this is a customer-facing plugin, so an unclassified name is far more
+likely production than a staff test session). Carry `<CARTA_ENVIRONMENT>`
+to Step 4's build command.
+
+### Instrumentation — every Carta MCP call in this step carries `_instrumentation_v2`
+
+Pass it on **every** `list_contexts`, `set_context`, `read_tool` and `call_tool` call:
+
+```
+_instrumentation_v2={...}
+```
+
+Add `"model": "<the running model id>"` only if you can introspect it; omit
+the key otherwise — never guess. If a call is rejected for missing
+instrumentation, re-send it silently with `_instrumentation_v2` as shown
+above — do not surface this to the user.
+
+Resolve firm identity via `mcp__<SERVER>__list_contexts`. If `<FIRM_ID_HINT>`
+was captured in Step 0.1 (user pasted a firm URL or UUID), call
+`list_contexts(firm_id=<FIRM_ID_HINT>, _instrumentation_v2={...})` or `firm_uuid=<FIRM_ID_HINT>` for an exact
+lookup — skip the fuzzy name path entirely. Otherwise:
+
+Call `mcp__<SERVER>__list_contexts(firm_name="<FIRM_NAME_INPUT>", _instrumentation_v2={...})`. **Important:** the endpoint does fuzzy/relevance matching against the caller's permission set and will return a *fallback* firm even when nothing truly matches the input token — do NOT trust the top hit blindly. Sanity-check every response as follows:
+
+1. **Normalize** `<FIRM_NAME_INPUT>` → `<TOKEN>` (strip whitespace, lowercase, remove punctuation like `-`, `,`, `.`).
+2. Compute the same normalization on each returned firm's canonical name → `<CANON>`.
+3. A hit is a **clean match** iff `<TOKEN>` is a substring of `<CANON>` OR `<CANON>` is a substring of `<TOKEN>` (either direction, so `"northstar"` matches `"northstarcapital"` and `"north-star capital llc"` matches `"north-star capital"`).
+4. If the top result is **not** a clean match, immediately retry with two more casing/spelling variants in a single parallel batch:
+   - `list_contexts(firm_name="<original casing>")` (the raw input)
+   - `list_contexts(firm_name="<TOKEN with hyphens preserved but capitalization flipped>")` — e.g. `North-Star` → `North-star`
+   - `list_contexts(firm_name="<TOKEN with hyphens removed>")` — e.g. `North-star` → `Northstar`
+5. Merge the three response sets, dedupe by firm ID, and re-apply the clean-match check.
+6. **Narrow out fund/SPV entities sharing the firm's name.** Carta Fund Admin
+   onboards each fund and SPV as its own `firm_id` too, and `list_contexts`
+   carries no type/kind field to tell those apart from the actual firm —
+   confirmed live against sandbox: searching `firm_name="Unusual Ventures"`
+   cleanly matches the firm itself *and* eight sibling entities, including
+   `"Unusual Ventures Fund III, L.P. for itself and as nominee for Unusual
+   Ventures Investment Partners Fund III, L.P."` and `"UNUSUAL VENTURES FUND
+   II, L.P."` — a fund/SPV's legal name almost always embeds the parent
+   firm's name as a substring, so the clean-match rule in step 3 alone
+   cannot separate them. Before classifying, check whether any clean match
+   is an **exact** normalized match (`<CANON>` equals `<TOKEN>`, not merely
+   a substring of it):
+   - **At least one exact match exists** → drop every clean match that is
+     not exact. A fund's expanded legal name is never identical to the bare
+     firm name a user types, so this reliably clears the fund/SPV noise
+     without a name-pattern blacklist (`"L.P."`, `"LLC"`, `"Fund"`, …) that
+     could just as easily hide a firm legitimately named e.g. "Acme Capital
+     Management, LLC". Classify only the exact-match survivors below.
+   - **No candidate is exact** (the typed name is itself a partial/fuzzy
+     variant, e.g. `"north-star"` for `"North-Star Capital"`) → keep the
+     full clean-match set as-is; narrowing only helps once a true anchor
+     exists.
+
+Then classify the narrowed clean-match set:
+
+- **Exactly one clean match** → set `<FIRM_UUID>`, `<FIRM_CARTA_ID>`, `<FIRM_NAME>` (canonical name from the response, not the user's input).
+  Proceed to Step 2 without asking: the endpoint only returns firms the
+  caller is permissioned for, so one clean match is already unambiguous.
+- **Multiple clean matches** → present up to 4 candidates via `AskUserQuestion`, one per option; user picks. If more than 4, take the top 4 and add a fifth "None of these — retype" option.
+- **Zero clean matches but non-empty fuzzy results** → do NOT silently accept a fuzzy fallback. Present the top 3 fuzzy results via `AskUserQuestion` with the framing *"No firm exactly matched '<FIRM_NAME_INPUT>' — did you mean one of these?"* plus a "None of these — retype" option. Only proceed once the user picks.
+- **Zero results across all variants** → tell the user *"No firm found matching '<FIRM_NAME_INPUT>'. Want to try a different name?"* and re-prompt via `AskUserQuestion`.
+
+Then `mcp__<SERVER>__set_context(firm_id=<FIRM_UUID>, _instrumentation_v2={...})` to activate the firm.
+
+## Step 1.5 — ManCo eligibility (HARD GATE)
+
+> **STOP. This is a hard gate.** This dashboard requires an active Carta
+> Fund Admin subscription AND an active management company. Verify here,
+> right after the firm resolves in Step 1; do not proceed to Step 2, fetch
+> any data, or launch the dashboard until eligibility is confirmed.
+
+Reached in the same cases as Step 1 (a MISS, or `<FORCE_REFRESH>`) — never on
+a WARM HIT or a soft hit, both of which already built successfully before,
+so eligibility was already confirmed on that earlier BUILD-path run.
+
+Call the eligibility pre-check, silently, right after Step 1's `set_context`:
+
+```
+mcp__<SERVER>__read_tool(name="fa__get__manco_eligibility", arguments={}, _instrumentation_v2={"skills": ["carta-investors:carta-manco-reporting"]})
+```
+
+This returns `{available, has_active_manco, has_fund_admin, fa_product_codes}` — a fast, cached pre-check against the firm `set_context` just activated.
+
+| `available` | `has_fund_admin` | `has_active_manco` | Action |
+|---|---|---|---|
+| `false` | — | — | Enrichment not yet synced or a transient DWH outage — **not** a denial. Surface the **Try again** message below and STOP. |
+| `true` | `false` | — | Surface the **No Fund Admin** message below and STOP. |
+| `true` | `true` | `false` | Set `<HAS_MANCO> = false`. Surface the **No ManCo** message below and STOP. |
+| `true` | `true` | `true` | Set `<HAS_MANCO> = true`. Proceed to Step 2. |
+| Call errors / times out | | | Do NOT auto-retry. Tell the user, plainly, that the eligibility check failed and to try again shortly, and STOP. |
+
+### Hard-gate discipline (non-negotiable)
+
+A `false` gating result is FINAL. You get **at most one**
+`fa__get__manco_eligibility` probe per invocation. After it returns a
+denial, you MUST stop. Do NOT:
+- re-run `fa__get__manco_eligibility` hoping the cached result changes within the same invocation,
+- fall back to `fa__list__entities` or a DWH query to "look for a ManCo another way,"
+- proceed to Step 2, fetch data, or launch the dashboard "to see if it works anyway,"
+- re-call `set_context` to re-authenticate — a fresh token does not grant a product the firm hasn't bought.
+
+### No ManCo message (surface verbatim, no preamble)
+
+Copy-paste the exact text below word for word — every sentence. Do not drop, reorder, or rephrase any part of it. Do not add anything before or after it.
+
+> I don't see Management Company Administration as part of your Carta plan. That's built for firm-level operations: firm-level financial position, expense allocations across entities, and managing your operating budget.
+>
+> Reach out to your account team or [request a demo →](https://carta.com/demo/fund-admin/?&utm_medium=product&utm_source=claude&utm_campaign=manco-plugin-inq-ww-q3-26) to get access. I can help you pull fund-level performance, LP reporting, or capital activity in the meantime.
+
+### No Fund Admin message (surface verbatim)
+
+> I can't find a Carta Fund Admin firm on your account, and these ManCo features run on Fund Admin data. If your firm uses Carta Fund Admin, reconnect Carta in **Settings → Connectors**; otherwise reach out to your Carta account manager to get Fund Admin set up.
+
+### Try again message (surface verbatim)
+
+> I'm still syncing your account details — this can take a moment for new or recently updated accounts. Please try again shortly.
+
+After surfacing any of these messages, this invocation ends here — do not
+proceed to Step 2, Step 3, or `serve.py`.
+
+## Step 2 — Resolve ManCo entity (BUILD path only)
+
+**SILENT** apart from the entity question below — no narration of what is being resolved,
+and no announcement that this step is starting ("Now Step 2 — resolve the ManCo entity" is
+exactly the kind of output [SKILL.md](../SKILL.md) forbids). Reaching this step is silent;
+the entity question, when one is actually needed, is the only visible output.
+
+Reached in the same cases as Step 1 (a MISS, or `<FORCE_REFRESH>`) — never
+on a WARM HIT or a soft hit, both of which already know the entity.
+
+Call `mcp__<SERVER>__read_tool(name="fa__list__entities", arguments={"entity_types": "management_co,fund"}, _instrumentation_v2={"skills": ["carta-investors:carta-manco-reporting"]})`.
+`entity_types` takes a comma-separated string, not a list — see `carta-soi`'s and
+`carta-portfolio-analytics-routing`'s `fa__list__entities` calls for the same convention.
+
+**Always pass `entity_types` — never fetch this unfiltered.** A firm with many
+`GP Entity`/`SPV`/`Elimination Entity`/`Holding` records (none of which this skill
+ever uses) can push the unfiltered response past `fa__list__entities`'s size cap,
+failing the whole call with `ToolError: response too large` instead of returning
+anything. Both `management_co` and `fund` are requested together — not just
+`management_co` — because this same response also becomes `entities.json` (see
+[data-fetch.md](data-fetch.md)'s "Save all results"), the fund roster Step 4 reads
+each fund's `carta_id` from for the fee-chart drill-down link. Narrowing to
+`management_co` alone would fix this call but silently break that later one.
+
+A firm's entity list is mostly funds. `fa__list__entities` returns
+`Fund`, `GP Entity`, `Management Co`, `SPV`, `Elimination Entity` and
+`Holding` together, and this dashboard reports on a management company —
+so **never offer the raw list**. Funds and SPVs are not answers to this
+question, and putting them in a picker invites a choice that produces an
+empty dashboard.
+
+Filter to `entity_type_string == "Management Co"` (or
+`entity_type_enum == 4`):
+
+- **Exactly one ManCo** → hold it and confirm below.
+- **Multiple ManCos** → `AskUserQuestion` over **those ManCos only**.
+
+**Hold the full response** — Step 3 persists it to `<raw_dir>/entities.json`
+(raw_dir isn't resolved until Step 2.5). It's the only source of each fund's
+own `carta_id`; a JE's own `FUND_CARTA_ID` column doesn't exist.
+
+**Zero ManCos** → fall back to `GP Entity` (`entity_type_enum == 2`).
+Some firms book management-company activity on their GP entity and carry
+no separate ManCo, and the dashboard reads the same way for either.
+
+- **Exactly one GP entity** → hold it and confirm below.
+- **Multiple GP entities** → `AskUserQuestion` over those.
+- **Neither** → say so and offer the only move left, rather than stopping
+  on a dead end: *"`<FIRM_NAME>` has no management company or GP entity in
+  Carta Fund Admin, so there is nothing for this dashboard to report on.
+  Want to try a different firm?"* — `AskUserQuestion`, and a yes re-enters
+  Step 1.
+
+Set `<MANCO_UUID>`, `<MANCO_CARTA_ID>`, `<MANCO_ENTITY_ID>` and
+`<MANCO_NAME>` from whichever entity was resolved.
+
+### Confirm the entity before fetching
+
+Two gates, in order: **the firm, then the entity under it.**
+
+Step 1 is the firm gate and already asks only when it needs to — one
+clean match the caller is permissioned for proceeds straight here, since
+`list_contexts` matches against the caller's own permission set. Nothing
+below re-litigates the firm.
+
+This is the entity gate. It asks whenever there's a real choice to confirm
+— several ManCos, or a GP entity standing in for a missing one — and skips
+asking when there isn't, below. Step 3 is a long fetch, and where it does
+ask, this is the last cheap place to catch a wrong entity; a dashboard
+built on the wrong one is wrong in every figure, under this skill's own
+name.
+
+It does **not** run on a warm or soft cache hit. Both reopen an entity a
+previous run already confirmed, and re-asking on every reload is the
+question that teaches a reader to stop reading questions.
+
+**Exactly one management company** → skip the confirmation outright; hold
+it and move straight into the build. There is nothing to disambiguate —
+Step 1 already settled which firm this is, and this is the only entity
+Carta's Fund Admin has for it. Asking "Build the dashboard for
+`<MANCO_NAME>`?" when there is no other candidate it could be is a
+question with only one honest answer, not a real check — unlike the
+several-ManCo picker below, where the ask *is* the disambiguation. This
+runs whether or not a budget workbook has been mentioned yet; the entity
+and the workbook are two independent questions, and finding only one
+ManCo already answers the first one on its own.
+
+**Several management companies** → the picker is the confirmation:
+
+> **Which management company under `<FIRM_NAME>`?**
+
+One option per ManCo, plus *"None of these — different firm"*.
+
+**Any GP-entity fallback** → always ask, whether one was found or several.
+This is a substitution, not a resolution: the reader asked for a management
+company and would be shown something else, and that must not pass as a
+detail.
+
+> **`<FIRM_NAME>` has no management company in Carta Fund Admin. Build
+> your dashboard on its GP entity, `<MANCO_NAME>`?**
+
+Offer *"Yes, build it"* and *"No — pick a different firm"* (back to Step 1).
+
+**Naming the firm.** Firm names are not unique in Carta — one client name
+matched four distinct firms in a real run — so `<FIRM_NAME>` alone may not
+say which firm this is. Disambiguate with the entity's own
+`_links.web_url`, linking the firm name, rather than printing a raw Carta
+ID at the reader: an internal identifier is the kind of thing the Carta UX
+rules keep out of user-facing copy, and a link answers the same question by
+being clickable.
+
+The three ManCo identifiers are different numbers on the same entity and are
+not interchangeable — take each from the field named here, never derive one
+from another:
+
+| Placeholder | Field on the `fa__list__entities` row | Used by |
+|---|---|---|
+| `<MANCO_UUID>` | `uuid` | the DWH queries' `FUND_UUID` filter |
+| `<MANCO_CARTA_ID>` | `carta_id` | in-product Carta URLs |
+| `<MANCO_ENTITY_ID>` | `id` | `fa__get__cash-balance`'s `entity_ids` |

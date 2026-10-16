@@ -1,0 +1,6 @@
+{
+  "repository": "typefully/agent-skills",
+  "ref": "default",
+  "path": "skills/typefully/SKILL.md",
+  "source": "https://github.com/typefully/agent-skills"
+}

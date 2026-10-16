@@ -1,0 +1,6 @@
+{
+  "repository": "prisma/skills",
+  "ref": "main",
+  "path": "prisma-client-api/SKILL.md",
+  "source": "https://github.com/prisma/skills/tree/main/prisma-client-api"
+}

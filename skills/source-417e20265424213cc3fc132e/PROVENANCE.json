@@ -1,0 +1,6 @@
+{
+  "repository": "anthropics/claude-plugins-official",
+  "ref": "main",
+  "path": "external_plugins/imessage/skills/access/SKILL.md",
+  "source": "https://github.com/anthropics/claude-plugins-official/tree/main/external_plugins/imessage"
+}

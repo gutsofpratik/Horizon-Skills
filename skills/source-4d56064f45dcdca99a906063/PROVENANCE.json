@@ -1,0 +1,6 @@
+{
+  "repository": "anthropics/claude-plugins-official",
+  "ref": "main",
+  "path": "plugins/project-artifact/skills/project-artifact/SKILL.md",
+  "source": "https://github.com/anthropics/claude-plugins-official/tree/main/plugins/project-artifact"
+}

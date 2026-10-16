@@ -1,0 +1,6 @@
+{
+  "repository": "replicate/skills",
+  "ref": "default",
+  "path": "skills/find-models/SKILL.md",
+  "source": "https://github.com/replicate/skills"
+}

@@ -1,0 +1,6 @@
+{
+  "repository": "duckdb/duckdb-skills",
+  "ref": "7feda8e01e22bc0886c86123f3884947e36d8c69",
+  "path": "skills/spatial/SKILL.md",
+  "source": "https://github.com/duckdb/duckdb-skills.git"
+}

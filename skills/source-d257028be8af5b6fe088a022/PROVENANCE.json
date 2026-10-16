@@ -1,0 +1,6 @@
+{
+  "repository": "aws/agent-toolkit-for-aws",
+  "ref": "7bde20faede49dd5764c02b54f5e306849f7e3ca",
+  "path": "plugins/aws-agents-for-devsecops/skills/setup/SKILL.md",
+  "source": "https://github.com/aws/agent-toolkit-for-aws.git"
+}

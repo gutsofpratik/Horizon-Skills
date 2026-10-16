@@ -1,0 +1,24 @@
+{
+  "router_skill": "data-capture-sdk",
+  "product_prefixes": [
+    "sparkscan-",
+    "barcode-capture-",
+    "label-capture-",
+    "id-capture-",
+    "matrixscan-ar-",
+    "matrixscan-batch-",
+    "matrixscan-count-",
+    "matrixscan-find-",
+    "matrixscan-pick-",
+    "barcode-selection-",
+    "parser-"
+  ],
+  "parity_exempt": [
+    "matrixscan-ar-annotation-ios",
+    "matrixscan-ar-highlight-ios"
+  ],
+  "platform_aliases": {
+    "matrixscan-ar-annotation-ios": "matrixscan-ar-ios",
+    "matrixscan-ar-highlight-ios": "matrixscan-ar-ios"
+  }
+}

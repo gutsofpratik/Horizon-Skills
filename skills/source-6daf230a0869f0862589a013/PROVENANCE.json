@@ -1,0 +1,6 @@
+{
+  "repository": "ClickHouse/agent-skills",
+  "ref": "356a8c1b9a7392adb389a132f5ad3fec38532a03",
+  "path": "skills/clickhouse-js-node-rowbinary/SKILL.md",
+  "source": "https://github.com/ClickHouse/agent-skills.git"
+}

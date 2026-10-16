@@ -1,0 +1,9 @@
+name: Example greeting CLI task
+version: "1"
+assumptions:
+  - Node.js is installed. The command is run from the supplied workspace.
+criteria:
+  - id: TASK.greeting
+    pass_when: Running node greet.cjs Ada prints exactly Hello, Ada! followed by one newline to stdout and exits zero.
+  - id: TASK.invalid_input
+    pass_when: Running node greet.cjs with no name prints a nonempty diagnostic only to stderr and exits nonzero.

@@ -1,0 +1,6 @@
+{
+  "repository": "dash0hq/agent-skills",
+  "ref": "default",
+  "path": "skills/otel-instrumentation/SKILL.md",
+  "source": "https://github.com/dash0hq/agent-skills"
+}

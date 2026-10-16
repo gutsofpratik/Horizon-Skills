@@ -1,0 +1,6 @@
+{
+  "repository": "microsoft/azure-skills",
+  "ref": "5b4f0c0778079a2f568581107f23349ce9a0a9b2",
+  "path": "skills/azure-kubernetes/azure-kubernetes-automatic-readiness/SKILL.md",
+  "source": "https://github.com/microsoft/azure-skills.git"
+}

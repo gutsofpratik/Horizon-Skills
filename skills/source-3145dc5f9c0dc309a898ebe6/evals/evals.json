@@ -1,0 +1,207 @@
+{
+  "skill_name": "forge-app-builder",
+  "evals": [
+    {
+      "id": "plan-only",
+      "prompt": "Plan a Forge app that summarizes Jira issue activity, but do not create or edit anything yet.",
+      "expected_output": "A current-documentation-grounded, decision-ready plan that stops before mutations or prerequisite checks.",
+      "files": [],
+      "expectations": [
+        "Routes to planning-only guidance",
+        "Grounds material Forge assumptions in current documentation",
+        "Separates required decisions from implementation choices that can be deferred",
+        "Does not mutate the repository or external state"
+      ]
+    },
+    {
+      "id": "fresh-stable-template",
+      "prompt": "Build a new Jira issue panel that shows related records from an external API using stable Forge features.",
+      "expected_output": "A fresh-app implementation that uses a current stable template when suitable and activates only module, UI, API, egress, and validation gates.",
+      "files": [],
+      "expectations": [
+        "Grounds the module, UI, and external-integration decisions in current official documentation",
+        "Uses forge create for app registration and a current documented template",
+        "Does not use Preview module composition when stable features were requested",
+        "Does not deploy or install without explicit authorization"
+      ]
+    },
+    {
+      "id": "fresh-module-composition",
+      "prompt": "Create a blank Forge app and compose a Jira issue panel and issue action with the new module command. I accept Preview features.",
+      "expected_output": "A registered blank app followed by inspected Preview module additions.",
+      "files": [],
+      "expectations": [
+        "Creates the app identity with forge create using the blank branch",
+        "Confirms the current forge module command lifecycle and exact module references",
+        "Runs forge module add with dry-run before each mutation",
+        "Inspects proposed manifest, source, package, and dependency changes",
+        "Does not use --force without approval for exact overwrites"
+      ]
+    },
+    {
+      "id": "decline-preview-module-command",
+      "prompt": "Add a Jira module using forge module add, but do not use any Preview or EAP capability.",
+      "expected_output": "A stable template or manual supported path after detecting that the requested module command is not allowed if it remains Preview.",
+      "files": [],
+      "expectations": [
+        "Retrieves the current lifecycle status of forge module add",
+        "Does not execute a non-GA module command when the user rejects Preview and EAP",
+        "Offers or applies a stable documented alternative"
+      ]
+    },
+    {
+      "id": "extend-existing-app",
+      "prompt": "Add an issue action to the existing Forge app in the provided repository.",
+      "expected_output": "An inspection-first extension that maps existing wiring, retrieves exact current references, and makes the smallest compatible change.",
+      "files": [
+        "fixtures/existing-ui-kit-app/manifest.yml",
+        "fixtures/existing-ui-kit-app/package.json",
+        "fixtures/existing-ui-kit-app/src/frontend.jsx",
+        "fixtures/existing-ui-kit-app/src/index.js"
+      ],
+      "expectations": [
+        "Inspects enough of the existing app and repository state to understand the affected architecture",
+        "Grounds the issue action and compatibility decisions in current official documentation",
+        "Chooses a compatible change strategy based on the existing app rather than a forced default",
+        "Preserves supported conventions and unrelated changes"
+      ]
+    },
+    {
+      "id": "existing-module-dry-run-conflict",
+      "prompt": "Use forge module add to add a Custom UI global page to this mature app; keep its pinned dependencies unchanged.",
+      "expected_output": "A dry-run-first assessment that refuses incompatible dependency upgrades and selects a manual extension if needed.",
+      "files": [],
+      "expectations": [
+        "Inspects the existing app before invoking module generation",
+        "Confirms current module-command lifecycle and runs --dry-run",
+        "Reviews package and source changes for conflicts with pinned dependencies",
+        "Does not use --force or upgrade dependencies contrary to the request"
+      ]
+    },
+    {
+      "id": "custom-ui",
+      "prompt": "Build a Forge global page that needs a full browser DOM and an existing React SPA.",
+      "expected_output": "A current-docs-backed Custom UI implementation with correct resource, bridge, security, and build boundaries.",
+      "files": [],
+      "expectations": [
+        "Grounds the relevant Custom UI boundaries in current official documentation",
+        "Does not load or apply UI Kit-only implementation guidance",
+        "Builds production resources before Forge validation",
+        "Keeps privileged operations and secrets out of browser code"
+      ]
+    },
+    {
+      "id": "headless-scheduled-trigger",
+      "prompt": "Build a headless Forge app that synchronizes Jira data on a schedule into Forge hosted storage.",
+      "expected_output": "A headless scheduled-work design using only module, backend/event, API/permission, storage, and validation gates.",
+      "files": [],
+      "expectations": [
+        "Does not load or apply UI Kit or Custom UI guidance",
+        "Accounts for the documented scheduled-delivery and runtime behavior that affects the design",
+        "Addresses authorization, storage, tenant isolation, and idempotency where relevant",
+        "Validates manifest and handler wiring"
+      ]
+    },
+    {
+      "id": "cross-product-permissions",
+      "prompt": "Extend a Confluence macro so its backend reads Jira issues too. Validate locally but do not deploy.",
+      "expected_output": "A cross-product change with exact API scopes and installation impact reported, stopping after local validation.",
+      "files": [],
+      "expectations": [
+        "Grounds the module, Jira API, authorization, and scope decisions in current official documentation",
+        "Reports cross-product deployment and installation or upgrade implications",
+        "Runs relevant local tests, build, and forge lint",
+        "Does not deploy, install, or upgrade"
+      ]
+    },
+    {
+      "id": "legacy-storage-migration",
+      "prompt": "Add a new cached lookup to an app that already uses the legacy storage export from @forge/api.",
+      "expected_output": "An inspection-grounded decision that evaluates current storage guidance and separates migration from feature work unless coupling is required.",
+      "files": [],
+      "expectations": [
+        "Retrieves current legacy storage support and migration guidance",
+        "Does not silently mix storage APIs or force an unrelated migration",
+        "Addresses material data lifecycle, isolation, compatibility, and migration implications"
+      ]
+    },
+    {
+      "id": "mcp-unavailable-or-renamed",
+      "prompt": "Plan a Confluence macro. The Forge MCP module-list tool mentioned by an older skill is unavailable.",
+      "expected_output": "Semantic tool discovery or transparent official-documentation fallback without relying on a hard-coded legacy tool name.",
+      "files": [],
+      "expectations": [
+        "Inspects the Forge capabilities currently available rather than assuming a permanent tool name",
+        "Reports any actual MCP failure accurately",
+        "Uses exact official module and UI documentation as fallback",
+        "Does not claim an MCP lookup succeeded when it did not"
+      ]
+    },
+    {
+      "id": "authorized-release-boundary",
+      "prompt": "The app is ready. Deploy it to production and upgrade every installation.",
+      "expected_output": "A low-freedom release flow that validates first and confirms exact live targets and impacts before consequential commands.",
+      "files": [],
+      "expectations": [
+        "Retrieves current deploy, install, environment, and version documentation",
+        "Validates locally before deployment",
+        "Confirms app, production environment, sites, products, version behavior, scopes, and migration impacts",
+        "Does not infer sites or select among multiple targets"
+      ]
+    },
+    {
+      "id": "environment-secret-configuration",
+      "prompt": "Configure an encrypted API credential for development and staging, but do not set anything in production.",
+      "expected_output": "An environment-aware configuration flow that distinguishes runtime secrets from manifest variables and leaves production unchanged.",
+      "files": [],
+      "expectations": [
+        "Retrieves current environment-variable and deployment behavior",
+        "Uses supported encrypted secret configuration without exposing the value in chat, source, or the manifest",
+        "Confirms the app, key, and non-production target environments before mutation",
+        "Does not set or copy a production value"
+      ]
+    },
+    {
+      "id": "forge-app-rest-api-preview",
+      "prompt": "Expose a REST endpoint from my Jira Forge app so an external service can invoke its report function.",
+      "expected_output": "A lifecycle-aware Forge app REST API or supported alternative chosen from current authentication and caller requirements.",
+      "files": [],
+      "expectations": [
+        "Distinguishes Forge app REST APIs from web triggers, outbound fetch, and Forge Remote",
+        "Retrieves the current apiRoute lifecycle, manifest, custom-scope, and 3LO requirements",
+        "Obtains agreement before implementing a non-GA capability",
+        "Accounts for input validation, authorization, limits, and installation effects"
+      ]
+    },
+    {
+      "id": "distribution-affecting-change",
+      "prompt": "Make this internal app available to non-contributor Jira users and allow portal customers to use its supported module.",
+      "expected_output": "An implementation-time access and distribution change grounded in current sharing and unlicensed-access rules without performing an unrequested production release.",
+      "files": [],
+      "expectations": [
+        "Retrieves current distribution and module-specific unlicensed-access documentation",
+        "Separates manifest or code changes from Developer Console sharing and production actions",
+        "Explains installation, consent, and testing implications",
+        "Does not enable sharing, deploy, or install without explicit authorization"
+      ]
+    },
+    {
+      "id": "route-release-readiness-review",
+      "prompt": "Review this Forge app and tell me whether it is ready to deploy to production.",
+      "expected_output": "A handoff to forge-app-review because the primary task is a broad pre-deploy readiness assessment.",
+      "files": [],
+      "expectations": [
+        "Routes the primary task to forge-app-review instead of duplicating its release-readiness checklist"
+      ]
+    },
+    {
+      "id": "route-known-failure",
+      "prompt": "My deployed Forge app shows a blank Custom UI panel and forge logs contain a resolver error.",
+      "expected_output": "A handoff to forge-debugger because the primary task is diagnosis of an observed failure.",
+      "files": [],
+      "expectations": [
+        "Routes the primary task to forge-debugger instead of applying the app-builder workflow"
+      ]
+    }
+  ]
+}

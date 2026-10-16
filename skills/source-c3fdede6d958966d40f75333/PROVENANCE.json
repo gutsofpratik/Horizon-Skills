@@ -1,0 +1,6 @@
+{
+  "repository": "redis/agent-skills",
+  "ref": "a84871d065f398fed55e1633f66b66f731eb4e2b",
+  "path": "plugins/redis-development/skills/redis-semantic-cache/SKILL.md",
+  "source": "https://github.com/redis/agent-skills.git"
+}

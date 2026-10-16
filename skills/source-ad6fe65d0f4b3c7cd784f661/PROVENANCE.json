@@ -1,0 +1,6 @@
+{
+  "repository": "zxkane/aws-skills",
+  "ref": "default",
+  "path": "plugins/aws-iac/skills/aws-cdk-development/SKILL.md",
+  "source": "https://github.com/zxkane/aws-skills"
+}

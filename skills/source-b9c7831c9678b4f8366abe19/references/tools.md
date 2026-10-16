@@ -1,0 +1,214 @@
+# Tool Reference — Zoom MCP Servers
+
+Tools available on Zoom's MCP servers. Treat the raw server tool names as authoritative.
+Some MCP clients namespace them in the UI, for example `zoom-mcp:recordings_list` or
+`zoom-canvas-mcp:create_file_with_content`.
+
+The current server inventory and complete tool-to-scope mapping is in
+[servers.md](servers.md). This reference covers the main workflows and is based on the current
+documented tool surfaces of:
+- `https://mcp.zoom.us/mcp/zoom/streamable`
+- `https://mcp.zoom.us/mcp/meeting/streamable`
+- `https://mcp.zoom.us/mcp/canvas/streamable`
+- `https://mcp.zoom.us/mcp/chat/streamable`
+- `https://mcp.zoom.us/mcp/tasks/streamable`
+- `https://mcp.zoom.us/mcp/revenue_accelerator/streamable`
+- `https://mcp.zoom.us/mcp/whiteboard/streamable`
+
+Treat the live MCP protocol `tools/list` response as the authoritative source for the current
+tool list and schemas.
+
+## Main Zoom MCP Server Tools
+
+The main Zoom MCP server exposes these tools:
+
+- `search_meetings`
+- `create_new_file_with_markdown`
+- `search_zoom`
+- `get_meeting_assets`
+- `get_recording_resource`
+- `get_file_content`
+- `recordings_list`
+- `hub_create_file_from_content`
+- `hub_get_file_content`
+
+The server did **not** expose older inferred tool names such as `list_meetings`,
+`get_meeting`, `create_meeting`, `get_user_profile`, `list_available_tools`, or
+`get_tool_details` in that probe.
+
+## Supported Scope Families Advertised by Zoom MCP
+
+Protected-resource metadata for the main Zoom MCP server advertised these scope families:
+- `ai_companion:read:search`
+- `meeting:read:assets`
+- `meeting:read:search`
+- `cloud_recording:read:content`
+- `cloud_recording:read:list_user_recordings`
+- `docs:write:import`
+- `docs:read:export`
+- `hub:write:content`
+- `hub:read:content`
+
+## Zoom Canvas MCP and Docs Tools
+
+The current Zoom Canvas MCP server exposes Canvas tools plus these Docs-compatible tools:
+
+- `create_file_with_content`
+- `get_file_content`
+
+The main Zoom MCP server also exposes Docs and Hub-capable tools:
+- main `zoom-mcp`: `create_new_file_with_markdown`, `get_file_content`
+- main `zoom-mcp`: `hub_create_file_from_content`, `hub_get_file_content`
+- current `zoom-canvas-mcp`: `create_file_with_content`, `get_file_content`
+
+The old dedicated Docs endpoint at `/mcp/docs/streamable` is retained only for compatibility and
+is not part of the current official server catalog. Use `zoom-canvas-mcp` for current Docs and
+Canvas workflows.
+
+### `create_file_with_content`
+
+Create a Zoom Docs document from Markdown content.
+
+**Verified scope:** `docs:write:import`
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `content` | string | **Yes** | Markdown formatted content |
+| `file_name` | string | No | Name of the new document |
+| `parent_id` | string | No | Parent file/folder ID; omit to place under My Docs |
+
+Successful calls return:
+- `file_id`
+- `file_link`
+
+### `get_file_content`
+
+Retrieve a Zoom Docs document in Markdown format.
+
+**Verified scope:** `docs:read:export`
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `fileId` | string | **Yes** | The unique identifier of the document file |
+
+### `create_new_file_with_markdown`
+
+Create a Zoom Docs document from Markdown content through the main Zoom MCP server.
+
+**Verified scope:** `docs:write:import`
+
+Use the live tool schema from `tools/list` for exact parameter names. This tool is the main Zoom
+MCP equivalent of `create_file_with_content` on the current Canvas MCP server.
+
+### `hub_create_file_from_content` and `hub_get_file_content`
+
+The main Zoom MCP server exposes Hub file operations with separate `hub:*` scopes. Use the live
+schema for exact `file_type`, `content`, and format parameters:
+
+- `hub_create_file_from_content` → `hub:write:content`
+- `hub_get_file_content` → `hub:read:content`
+
+## Meeting Discovery and Assets
+
+### `search_zoom`
+
+Search across Zoom content using the main Zoom MCP server.
+
+**Verified scope family:** `ai_companion:read:search`
+
+Use this for broad Zoom search across supported meeting, chat, and document content. Prefer
+`search_meetings` when the user specifically wants meeting discovery and the meeting-specific
+tool schema fits the task.
+
+### `search_meetings`
+
+Read-only search tool for semantic meeting discovery.
+
+**Verified scope:** `meeting:read:search`
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `q` | string | No | Search query keyword |
+| `from` | string | No | UTC start datetime |
+| `to` | string | No | UTC end datetime |
+| `page_size` | integer | No | Results per page; default `50`, max `300` |
+| `next_page_token` | string | No | Pagination token; expires in 15 minutes |
+
+### `get_meeting_assets`
+
+Read-only meeting asset hub. Retrieves meeting summary, recording, whiteboards, Zoom Docs,
+and related artifacts for a specific meeting.
+
+**Verified scope:** `meeting:read:assets`
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `meetingId` | string | **Yes** | Numeric meeting number or UUID; the schema prefers UUID when available |
+
+**Important live-schema note:**
+- UUID-style values may require double encoding when they contain `/` or `//`.
+- The tool description strongly prefers explicit user selection when choosing a meeting from search results.
+
+## Recordings
+
+### `recordings_list`
+
+List cloud recordings for a user.
+
+**Verified scope:** `cloud_recording:read:list_user_recordings`
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `userId` | string | **Yes** | User ID; user OAuth commonly accepts `me` |
+| `from` | string | No | Start date |
+| `to` | string | No | End date |
+| `meeting_id` | integer | No | Filter by meeting number |
+| `trash` | boolean | No | Include trashed recordings |
+| `trash_type` | string | No | Trash filter category |
+| `mc` | string | No | Additional recording filter flag from the live schema |
+| `page_size` | integer | No | Results per page; default `30`, max `300` |
+| `next_page_token` | string | No | Pagination token |
+
+### `get_recording_resource`
+
+Retrieve recording-oriented assets for a specific meeting, including transcript-like,
+summary-like, and playback-oriented resources.
+
+**Verified scope:** `cloud_recording:read:content`
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `meetingId` | string | **Yes** | Meeting UUID or recording-capable identifier |
+| `types` | string | No | Resource type selector |
+| `clip_num` | integer | No | Clip number / segment selector |
+| `play_time` | integer | No | Playback position |
+| `raw_passcode` | string | No | Plaintext recording passcode |
+| `encode_passcode` | string | No | Encoded recording passcode |
+
+**Output shape from live schema includes resource families such as:**
+- transcript timelines
+- summaries
+- next steps
+- play URLs
+
+## Current Product-Specific Surfaces
+
+For the complete tool list and exact scope mapping, use [servers.md](servers.md). The current
+product-specific surfaces are:
+
+| Server | Endpoint | Primary capability |
+|---|---|---|
+| Meetings | `https://mcp.zoom.us/mcp/meeting/streamable` | Meeting search, assets, and recordings |
+| Canvas | `https://mcp.zoom.us/mcp/canvas/streamable` | Docs/Canvas files, blocks, collaborators, and access |
+| Chat | `https://mcp.zoom.us/mcp/chat/streamable` | Chat messages, channels, contacts, files, and sessions |
+| Tasks | `https://mcp.zoom.us/mcp/tasks/streamable` | Tasks, steps, comments, assignees, and collaborators |
+| Revenue Accelerator | `https://mcp.zoom.us/mcp/revenue_accelerator/streamable` | Conversations, deals, analysis, scorecards, CRM, and teams |
+| Whiteboard | `https://mcp.zoom.us/mcp/whiteboard/streamable` | Whiteboards and collaborators |
+
+## Discovery Notes
+
+- Discovery happens through MCP protocol `tools/list`, not through a dedicated Zoom utility tool.
+- Re-run `tools/list` whenever you need to confirm whether the current tool list has changed.
+- Do not rely on older examples that use `query`, `startDate`, `endDate`, or `pageSize`; the current live schema uses `q`, `from`, `to`, and `page_size`.
+- Docs work is available through the main `zoom-mcp` server and the current Canvas MCP server.
+  Check `tools/list` on the active server and use the exact exposed tool name.

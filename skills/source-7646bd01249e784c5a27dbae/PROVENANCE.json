@@ -1,0 +1,6 @@
+{
+  "repository": "supabase/agent-skills",
+  "ref": "default",
+  "path": "skills/supabase/SKILL.md",
+  "source": "https://github.com/supabase/agent-skills"
+}
