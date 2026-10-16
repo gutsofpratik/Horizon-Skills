@@ -12743,6 +12743,17 @@
       ],
       "components": [],
       "status": "available"
+    },
+    {
+      "id": "collection-432677e702deee90",
+      "name": "Notion Integration Skills",
+      "description": "Official Notion connectors for Claude",
+      "kind": "skill",
+      "family": "Claude skills collection",
+      "sourceUrl": "https://notiondevs.notion.site/Notion-Skills-for-Claude-28da4445d27180c7af1df7d8615723d0",
+      "skillIds": [],
+      "status": "unavailable",
+      "reason": "This entry links to a Notion page; no redistributable GitHub skill package is available."
     }
   ],
   "skills": [
