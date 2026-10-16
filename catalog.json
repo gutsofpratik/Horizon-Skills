@@ -6200,8 +6200,8 @@
       "sourceUrl": "https://github.com/astronomer/agents.git",
       "sourceFamily": "Claude plugins official",
       "packagePath": "packages/source-61a467399a4078adb9b0a32b.zip",
-      "sha256": "24e09a96a31b095ef487a6a9be92673d57de2944bfa14563bf01305f6467c817",
-      "bytes": 11802,
+      "sha256": "a264205d38a6b997c105f970094b39dfaaeac83b6dd4e32b6f0f3768e5cc675d",
+      "bytes": 11314,
       "license": "See UPSTREAM-LICENSE.txt"
     },
     {
@@ -20247,8 +20247,8 @@
       "sourceUrl": "https://github.com/gitroomhq/postiz-agent.git",
       "sourceFamily": "Claude plugins official",
       "packagePath": "packages/source-ea45a853b2b8b2b911914e0d.zip",
-      "sha256": "349011a3e3ac110b65d42fd62a4fd9b81f7bb1f4de4d48da340ec68c56290a3c",
-      "bytes": 129352,
+      "sha256": "c5c138fc78056e14c24dbde77d4bb99fcc2f3ed11d4c89bbb387c77170ef51ac",
+      "bytes": 127938,
       "license": "See UPSTREAM-LICENSE.txt"
     },
     {
@@ -29663,8 +29663,8 @@
       "sourceUrl": "https://github.com/zarazhangrui/frontend-slides",
       "sourceFamily": "Claude skills collection",
       "packagePath": "packages/source-479a192dbd05edec8d1fd3e5.zip",
-      "sha256": "b7a0b61aace40e71469e69393958431a7912e10a258642248e03b362e3833831",
-      "bytes": 1243360,
+      "sha256": "51d3e977dd3d51f1d044e04ab158ba0634a58638fce11b7c7b95648f07a901ad",
+      "bytes": 1242101,
       "license": "See UPSTREAM-LICENSE.txt"
     },
     {
@@ -29905,8 +29905,8 @@
       "sourceUrl": "https://github.com/omkamal/pypict-claude-skill",
       "sourceFamily": "Claude skills collection",
       "packagePath": "packages/source-9fda18f84f1267f9d26cf507.zip",
-      "sha256": "a4f43cd71bfab569519eb3629d6aae563fd5517dd6f5522aed18703710b09c4f",
-      "bytes": 63064,
+      "sha256": "e054e7e88220858bca5f59b6f56dc3be5680c325b4379a1335bdfc4638e752bc",
+      "bytes": 61839,
       "license": "See UPSTREAM-LICENSE.txt"
     },
     {
@@ -30939,8 +30939,8 @@
       "sourceUrl": "https://github.com/AdrianAdem/prompt-engineer-skill",
       "sourceFamily": "Claude skills collection",
       "packagePath": "packages/source-cbe2baa185ab1029b73d9e14.zip",
-      "sha256": "27962394feb7ea060b846cb53ea58d160282abc075e7ae32777523ab2543ebe9",
-      "bytes": 46832,
+      "sha256": "8b6afff2f4e58906601c92b37607db122aeb9b16b7dbc56b6a75a5816d425912",
+      "bytes": 44198,
       "license": "See UPSTREAM-LICENSE.txt"
     },
     {
@@ -35548,8 +35548,8 @@
       "sourceUrl": "https://github.com/blader/humanizer",
       "sourceFamily": "Claude skills collection",
       "packagePath": "packages/source-03289b221945ce5516b008f7.zip",
-      "sha256": "65c220972a7db4521a43008911c9d140f39debc2634d406573cc5b8b8854d489",
-      "bytes": 30618,
+      "sha256": "d1b20aa5275db357a38be1011cc8fdfd0a2128d6df82b5ba2df89284959eb1a7",
+      "bytes": 29684,
       "license": "See UPSTREAM-LICENSE.txt"
     },
     {
@@ -37209,8 +37209,8 @@
       "sourceUrl": "https://github.com/wrsmith108/linear-claude-skill",
       "sourceFamily": "Claude skills collection",
       "packagePath": "packages/source-cf383a56a2ee756c8607fb34.zip",
-      "sha256": "9cf4ed5b1c98aaa3d7e8f3922721401cdabe83adc3c72c9e0c4895df5ad03bea",
-      "bytes": 202243,
+      "sha256": "fb98624a5dd28c69e4b6f6a5e87509e73f6044aa5c04f42c1aaf3e585582d227",
+      "bytes": 200523,
       "license": "See UPSTREAM-LICENSE.txt"
     },
     {
