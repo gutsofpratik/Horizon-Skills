@@ -1,1 +1,3 @@
 OpenClaude Skills mirrors skill packages only, with per-package upstream licenses and provenance. Plugin discovery and installation use the official Anthropic marketplace directly; plugin bundles are not mirrored here. Restricted packages are not redistributed. Inclusion is not endorsement by Anthropic.
+
+The root LICENSE applies only to original OpenClaude-authored repository contributions. Third-party skill files and packages remain subject to their respective UPSTREAM-LICENSE.txt and included notices; the root license does not relicense them.
