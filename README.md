@@ -1,6 +1,6 @@
 # OpenClaude Skills
 
-A public skill catalog for [OpenClaude](https://github.com/movedtodarkhaxop/OpenClaude): discover reusable instructions, inspect their source, and install the skills you need.
+A public skill catalog for [OpenClaude](https://github.com/gutsofpratik/OpenClaude): discover reusable instructions, inspect their source, and install the skills you need.
 
 This repository distributes **skills**, not plugin bundles. Plugins remain connected to their upstream marketplaces. OpenClaude is an independent project and is not affiliated with or endorsed by Anthropic.
 
@@ -64,6 +64,6 @@ Skills are executable guidance for an AI assistant and may include scripts. Revi
 
 ## Corrections and contributions
 
-[Open an issue](https://github.com/movedtodarkhaxop/OpenClaude-Skills/issues) for a broken package, attribution error, licensing concern, or catalog correction. Include the skill ID and source URL. For a contribution, provide the skill instructions, supporting files, provenance, and an explicit redistribution license. Do not submit proprietary skill packs, credentials, or complete plugin bundles.
+[Open an issue](https://github.com/gutsofpratik/OpenClaude-Skills/issues) for a broken package, attribution error, licensing concern, or catalog correction. Include the skill ID and source URL. For a contribution, provide the skill instructions, supporting files, provenance, and an explicit redistribution license. Do not submit proprietary skill packs, credentials, or complete plugin bundles.
 
-For the desktop and web application, visit [OpenClaude](https://github.com/movedtodarkhaxop/OpenClaude).
+For the desktop and web application, visit [OpenClaude](https://github.com/gutsofpratik/OpenClaude).

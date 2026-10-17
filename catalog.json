@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedAt": "2026-10-16T17:59:41.590Z",
-  "repository": "movedtodarkhaxop/OpenClaude-Skills",
+  "repository": "gutsofpratik/OpenClaude-Skills",
   "sources": [
     "https://github.com/anthropics/claude-plugins-official",
     "https://github.com/abubakarsiddik31/claude-skills-collection"
